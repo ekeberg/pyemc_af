@@ -44,7 +44,7 @@ ext = Extension("_emc_cuda",
                 library_dirs=[CUDA["lib64"]],
                 libraries=["cudart"],
                 runtime_library_dirs=[CUDA["lib64"]],
-                extra_compile_args={"clang": ["-W1", "--no-undefined"],
+                extra_compile_args={"clang": [],
                                     "nvcc": ["--ptxas-options=-v", "-c", "--compiler-options", "'-fPIC'"]},
                                     #"nvcc": ["-arch=sm_20", "--ptxas-options=-v", "-c", "--compiler-options", "'-fPIC'"]},
                 include_dirs=[numpy_include, CUDA["include"], "src"])
