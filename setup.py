@@ -39,8 +39,8 @@ try:
 except AttributeError:
     numpy_include = numpy.get_numpy_include()
 
-ext = Extension("afemc",
-                sources=["src/afemc_swig_wrap.cpp", "src/afemc.cu"],
+ext = Extension("_emc_cuda",
+                sources=["src/emc_cuda_swig_wrap.cpp", "src/emc_cuda.cu"],
                 library_dirs=[CUDA["lib64"]],
                 libraries=["cudart"],
                 runtime_library_dirs=[CUDA["lib64"]],
@@ -50,7 +50,7 @@ ext = Extension("afemc",
                 include_dirs=[numpy_include, CUDA["include"], "src"])
 
 if find_in_path("swig", os.environ["PATH"]):
-    subprocess.check_call("swig -python -c++ -o src/afemc_swig_wrap.cpp src/afemc.i", shell=True)
+    subprocess.check_call("swig -python -c++ -o src/emc_cuda_swig_wrap.cpp src/emc_cuda.i", shell=True)
 else:
     raise EnvironmentError("The swig executable was not found in your PATH")
 
@@ -77,13 +77,13 @@ class custom_build_ext(build_ext):
         #super(custom_build_ext, self).build_extension(ext)
         build_ext.build_extension(self, ext)
 
-setuptools.setup(name="afemc",
+setuptools.setup(name="emc",
                  author="Tomas Ekeberg",
                  version="0.1",
-                 py_modules=["afemc"],
-                 package_dir={"": "."},
+                 py_modules=["emc", "emc_cuda"],
+                 package_dir={"": "src"},
                  ext_modules=[ext],
                  cmdclass={"build_ext": custom_build_ext},
                  zip_safe=False)
 
-os.system("mv build/lib.macosx-10.10-intel-2.7/afemc.so build/lib.macosx-10.10-intel-2.7/_afemc.so")
+#os.system("mv build/lib.macosx-10.10-intel-2.7/emc_cuda.so build/lib.macosx-10.10-intel-2.7/_emc_cuda.so")
