@@ -35,6 +35,15 @@ void cuda_calculate_responsabilities_poisson(const float *const patterns, const 
 					     const int image_x, const int image_y,
 					     float *const responsabilities, const float *const log_factorial_table);
 
+void cuda_calculate_responsabilities_poisson_scaling(const float *const patterns, const int number_of_patterns,
+						     const float *const slices, const int number_of_rotations,
+						     const int image_x, const int image_y, const float *const scalings,
+						     float *const responsabilities, const float *const log_factorial_table);
+
+void cuda_calculate_scaling_poisson(const float *const patterns, const int number_of_patterns,
+				    const float *const slices, const int number_of_rotations,
+				    const int number_of_pixels, float *const scalings);
+
 void cuda_update_slices_sparse(float *const slices, const int number_of_rotations, const int *const pattern_start_indices,
 			       const int *const pattern_indices, const float *const pattern_values, const int number_of_patterns,
 			       const int image_x, const int image_y, const float *const responsabilities);

@@ -3,9 +3,17 @@ import afnumpy
 
 _MAX_PHOTON_COUNT = 100
 
+def _get_pointer(array):
+    if array.dtype == afnumpy.float32:
+        return emc_cuda.int_to_float_pointer(array.d_array.device_ptr())
+    elif array.dtype == afnumpy.int32:
+        return emc_cuda.int_to_int_pointer(array.d_array.device_ptr())
+    else:
+        raise ValueError("_get_pointer received argument with unrecognized dtype: {0}".format(array.dtype))
+
 def set_to_value(array, value):
     size = len(array.flatten())
-    array_pointer = emc_cuda.int_to_float_pointer(array.d_array.device_ptr())
+    array_pointer = _get_pointer(array)
     emc_cuda.set_to_value(array_pointer, size, value)
 
 def masked_set(array, mask, value):
@@ -16,8 +24,8 @@ def masked_set(array, mask, value):
         raise ValueError("Array must be of type float32")
     #mask = afnumpy.int32(mask)
     size = len(array.flatten())
-    array_pointer = emc_cuda.int_to_float_pointer(array.d_array.device_ptr())
-    mask_pointer = emc_cuda.int_to_int_pointer(mask.d_array.device_ptr())
+    array_pointer = _get_pointer(array)
+    mask_pointer = _get_pointer(mask)
     emc_cuda.masked_set(array_pointer, mask_pointer, size, value)
 
 def equivalent_sigma(number_of_pixels):
@@ -36,15 +44,15 @@ def expand_model(model, slices, rotations, coordinates):
         raise ValueError("coordinates must be 3xXxY array where X and Y are the dimensions of the slices.")
 
     number_of_rotations = len(rotations)
-    model_pointer = emc_cuda.int_to_float_pointer(model.d_array.device_ptr())
-    slices_pointer = emc_cuda.int_to_float_pointer(slices.d_array.device_ptr())
-    rotations_pointer = emc_cuda.int_to_float_pointer(rotations.d_array.device_ptr())
-    coordinates_pointer = emc_cuda.int_to_float_pointer(coordinates.d_array.device_ptr())
+    model_pointer = _get_pointer(model)
+    slices_pointer = _get_pointer(slices)
+    rotations_pointer = _get_pointer(rotations)
+    coordinates_pointer = _get_pointer(coordinates)
     emc_cuda.cuda_expand_model(model_pointer, model.shape[2], model.shape[1], model.shape[0],
                                slices_pointer, slices.shape[2], slices.shape[1],
                                rotations_pointer, number_of_rotations,
                                coordinates_pointer)
-
+    
 def get_slice(model, rotation, coordinates):
     if len(rotation) != 4:
         raise ValueError("rotations must be a quaternion (len 4 array)")
@@ -56,17 +64,16 @@ def get_slice(model, rotation, coordinates):
     model = afnumpy.array(model, dtype="float32")
     this_slice = afnumpy.zeros(coordinates.shape[1:], dtype="float32").reshape((1,) + coordinates.shape[1:])
     rotation = afnumpy.array(rotation, dtype="float32").reshape((1, 4))
-    model_pointer = emc_cuda.int_to_float_pointer(model.d_array.device_ptr())
-    this_slice_pointer = emc_cuda.int_to_float_pointer(this_slice.d_array.device_ptr())
-    rotation_pointer = emc_cuda.int_to_float_pointer(rotation.d_array.device_ptr())
-    coordinates_pointer = emc_cuda.int_to_float_pointer(coordinates.d_array.device_ptr())
+    model_pointer = _get_pointer(model)
+    this_slice_pointer = _get_pointer(this_slice)
+    rotation_pointer = _get_pointer(rotations)
+    coordinates_pointer = _get_pointer(coordinates)
     emc_cuda.cuda_expand_model(model_pointer, model.shape[2], model.shape[1], model.shape[0],
                                this_slice_pointer, coordinates.shape[2], coordinates.shape[1],
                                rotation_pointer, 1,
                                coordinates_pointer)
     return this_slice
     
-
 def insert_slices(model, model_weights, slices, slice_weights, rotations, coordinates):
     if len(slices) != len(rotations):
         raise ValueError("slices and rotations must be of the same length.")
@@ -84,12 +91,12 @@ def insert_slices(model, model_weights, slices, slice_weights, rotations, coordi
         raise ValueError("coordinates must be 3xXxY array where X and Y are the dimensions of the slices.")
 
     number_of_rotations = len(rotations)
-    model_pointer = emc_cuda.int_to_float_pointer(model.d_array.device_ptr())
-    model_weights_pointer = emc_cuda.int_to_float_pointer(model_weights.d_array.device_ptr())
-    slices_pointer = emc_cuda.int_to_float_pointer(slices.d_array.device_ptr())
-    slice_weights_pointer = emc_cuda.int_to_float_pointer(slice_weights.d_array.device_ptr())
-    rotations_pointer = emc_cuda.int_to_float_pointer(rotations.d_array.device_ptr())
-    coordinates_pointer = emc_cuda.int_to_float_pointer(coordinates.d_array.device_ptr())
+    model_pointer = _get_pointer(model)
+    model_weights_pointer = _get_pointer(model_weights)
+    slices_pointer = _get_pointer(slices)
+    slice_weights_pointer = _get_pointer(slice_weights)
+    rotations_pointer = _get_pointer(rotations)
+    coordinates_pointer = _get_pointer(coordinates)
     emc_cuda.cuda_insert_slices(model_pointer, model_weights_pointer,
                                 model.shape[2], model.shape[1], model.shape[0],
                                 slices_pointer, slices.shape[2], slices.shape[1],
@@ -97,16 +104,15 @@ def insert_slices(model, model_weights, slices, slice_weights, rotations, coordi
                                 rotations_pointer, number_of_rotations,
                                 coordinates_pointer)
 
-
 def update_slices(slices, patterns, responsabilities):
     if len(patterns.shape) != 3: raise ValueError("patterns must be a 3D array")
     if len(slices.shape) != 3: raise ValueError("slices must be a 3D array.")
     if patterns.shape[1:] != slices.shape[1:]: raise ValueError("patterns and images must be the same size 2D images")
     if len(responsabilities.shape) != 2 or slices.shape[0] != responsabilities.shape[0] or patterns.shape[0] != responsabilities.shape[1]:
         raise ValueError("responsabilities must have shape nrotations x npatterns")
-    slices_pointer = emc_cuda.int_to_float_pointer(slices.d_array.device_ptr())
-    patterns_pointer = emc_cuda.int_to_float_pointer(patterns.d_array.device_ptr())
-    responsabilities_pointer = emc_cuda.int_to_float_pointer(responsabilities.d_array.device_ptr())
+    slices_pointer = _get_pointer(slices)
+    patterns_pointer = _get_pointer(patterns)
+    responsabilities_pointer = _get_pointer(responsabilities)
     emc_cuda.cuda_update_slices(slices_pointer, slices.shape[0], patterns_pointer, patterns.shape[0], patterns.shape[2], patterns.shape[1], responsabilities_pointer)
     
     
@@ -118,17 +124,11 @@ def calculate_responsabilities(patterns, slices, responsabilities, sigma):
         raise ValueError("responsabilities must have shape nrotations x npatterns")
     #sigma = afnumpy.float32(sigma)
     if sigma <= 0.: raise ValueError("sigma must be larger than zeros")
-    patterns_pointer = emc_cuda.int_to_float_pointer(patterns.d_array.device_ptr())
-    slices_pointer = emc_cuda.int_to_float_pointer(slices.d_array.device_ptr())
-    responsabilities_pointer = emc_cuda.int_to_float_pointer(responsabilities.d_array.device_ptr())
+    patterns_pointer = _get_pointer(patterns)
+    slices_pointer = _get_pointer(slices)
+    responsabilities_pointer = _get_pointer(responsabilities)
     emc_cuda.cuda_calculate_responsabilities(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0],
                                              slices.shape[2], slices.shape[1], responsabilities_pointer, sigma)
-
-"""void cuda_calculate_responsabilities_poisson(const float *const patterns, const int number_of_patterns,
-					     const float *const slices, const int number_of_rotations,
-					     const int image_x, const int image_y,
-					     float *const responsabilities, const float *constlog_factorial_table);
-"""
 
 def _log_factorial_table(max_value):
     if max_value > _MAX_PHOTON_COUNT:
@@ -139,8 +139,7 @@ def _log_factorial_table(max_value):
         log_factorial_table[i] = log_factorial_table[i-1] + afnumpy.log(i)
     return log_factorial_table
 
-
-def calculate_responsabilities_poisson(patterns, slices, responsabilities):
+def calculate_responsabilities_poisson(patterns, slices, responsabilities, scalings=None):
     if len(patterns.shape) != 3: raise ValueError("patterns must be a 3D array")
     if len(slices.shape) != 3: raise ValueError("slices must be a 3D array")
     if patterns.shape[1:] != slices.shape[1:]: raise ValueError("patterns and images must be the same size 2D images")
@@ -149,16 +148,22 @@ def calculate_responsabilities_poisson(patterns, slices, responsabilities):
     if (calculate_responsabilities_poisson.log_factorial_table is None or
         len(calculate_responsabilities_poisson.log_factorial_table) <= patterns.max()):
         calculate_responsabilities_poisson.log_factorial_table = _log_factorial_table(patterns.max())
-
-    patterns_pointer = emc_cuda.int_to_float_pointer(patterns.d_array.device_ptr())
-    slices_pointer = emc_cuda.int_to_float_pointer(slices.d_array.device_ptr())
-    responsabilities_pointer = emc_cuda.int_to_float_pointer(responsabilities.d_array.device_ptr())
-    log_factorial_table_pointer = emc_cuda.int_to_float_pointer(calculate_responsabilities_poisson.log_factorial_table.d_array.device_ptr())
-    emc_cuda.cuda_calculate_responsabilities_poisson(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0],
-                                                     slices.shape[2], slices.shape[1], responsabilities_pointer, log_factorial_table_pointer)
+    if scalings is not None and scalings.shape != responsabilities.shape:
+        raise ValueError("Scalings must have the same shape as responsabilities")
+    patterns_pointer = _get_pointer(patterns)
+    slices_pointer = _get_pointer(slices)
+    responsabilities_pointer = _get_pointer(responsabilities)
+    log_factorial_table_pointer = _get_pointer(calculate_responsabilities_poisson.log_factorial_table)
+    if scalings is None:
+        emc_cuda.cuda_calculate_responsabilities_poisson(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0],
+                                                         slices.shape[2], slices.shape[1], responsabilities_pointer, log_factorial_table_pointer)
+    else:
+        scalings_pointer = _get_pointer(scalings)
+        emc_cuda.cuda_calculate_responsabilities_poisson_scaling(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0],
+                                                                 slices.shape[2], slices.shape[1], scalings_pointer,
+                                                                 responsabilities_pointer, log_factorial_table_pointer)
 calculate_responsabilities_poisson.log_factorial_table = None
-    
-
+        
 def calculate_responsabilities_sparse(patterns, slices, responsabilities):
     if not isinstance(patterns, dict):
         raise ValueError("patterns must be a dictionary containing the keys: indcies, values and start_indices")
@@ -203,14 +208,9 @@ def calculate_responsabilities_sparse(patterns, slices, responsabilities):
                                                     responsabilities_pointer,
                                                     slice_sums_pointer,
                                                     log_factorial_table_pointer)
+
 calculate_responsabilities_sparse.log_factorial_table = None
 calculate_responsabilities_sparse.slice_sums = None
-
-"""
-void cuda_update_slices_sparse(float *const slices, const int number_of_rotations, const int *const pattern_start_indices,
-			       const int *const pattern_indices, const float *const pattern_values, const int number_of_patterns,
-			       const int image_x, const int image_y, const float *const responsabilities));
-"""
 def update_slices_sparse(slices, patterns, responsabilities):
     if (not "indices" in patterns or
         not "values" in patterns or
@@ -237,8 +237,23 @@ def update_slices_sparse(slices, patterns, responsabilities):
     emc_cuda.cuda_update_slices_sparse(slices_pointer, number_of_rotations, pattern_start_indices_pointer,
                                        pattern_indices_pointer, pattern_values_pointer, number_of_patterns,
                                        slices.shape[2], slices.shape[1], responsabilities_pointer)
-
     
+def calculate_scaling_poisson(patterns, slices, scaling):
+    if len(patterns.shape) != 3:
+        raise ValueError("Patterns must be a 3D array")
+    if len(slices.shape) != 3:
+        raise ValueError("Slices must be a 3D array")
+    if len(scaling.shape) != 2:
+        raise ValueError("Slices must be a 2D array")
+    if slices.shape[1:] != patterns.shape[1:]:
+        raise ValueError("Slices and patterns must be the same shape")
+    if scaling.shape[0] != slices.shape[0] or scaling.shape[1] != patterns.shape[0]:
+        raise ValueError("scaling must have shape nrotations x npatterns")        
+    patterns_pointer = emc_cuda.int_to_float_pointer(patterns.d_array.device_ptr())
+    slices_pointer = emc_cuda.int_to_float_pointer(slices.d_array.device_ptr())
+    scaling_pointer = emc_cuda.int_to_float_pointer(scaling.d_array.device_ptr())
+    emc_cuda.cuda_calculate_scaling_poisson(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0], afnumpy.prod(slices[1:]), scaling_pointer)
+
 def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
     pixels_to_im = pixel_size/detector_distance/wavelength
     x0_pixels = afnumpy.arange(image_shape[0], dtype="float32") - image_shape[0]/2 + 0.5
@@ -259,7 +274,6 @@ def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
     output_coordinates[1, :, :] = x1_2d
     output_coordinates[2, :, :] = x2_pixels
     return output_coordinates
-
 
 def rotate_model(model, rotated_model, rotation):
     rotation = afnumpy.array(rotation, dtype="float32")
