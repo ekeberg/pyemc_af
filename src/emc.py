@@ -93,7 +93,6 @@ def insert_slices(model, model_weights, slices, slice_weights, rotations, coordi
         raise ValueError("coordinates must be 3xXxY array where X and Y are the dimensions of the slices.")
 
     interpolation_int = _INTERPOLATION[interpolation]
-
     number_of_rotations = len(rotations)
     model_pointer = _get_pointer(model)
     model_weights_pointer = _get_pointer(model_weights)
@@ -108,7 +107,8 @@ def insert_slices(model, model_weights, slices, slice_weights, rotations, coordi
                                 rotations_pointer, number_of_rotations,
                                 coordinates_pointer, interpolation_int)
 
-def insert_slices_partial(partial_model, partial_model_weights, full_model_shape, partial_model_corner, slices, slice_weights, rotations, coordinates):
+def insert_slices_partial(partial_model, partial_model_weights, full_model_shape, partial_model_corner,
+                          slices, slice_weights, rotations, coordinates, interpolation="linear"):
     if len(slices) != len(rotations):
         raise ValueError("slices and rotations must be of the same length.")
     if len(slices) != len(slice_weights):
@@ -124,6 +124,7 @@ def insert_slices_partial(partial_model, partial_model_weights, full_model_shape
     if len(coordinates.shape) != 3 or coordinates.shape[0] != 3 or coordinates.shape[1:] != slices.shape[1:]:
         raise ValueError("coordinates must be 3xXxY array where X and Y are the dimensions of the slices.")
 
+    interpolation_int = _INTERPOLATION[interpolation]
     number_of_rotations = len(rotations)
     partial_model_pointer = _get_pointer(partial_model)
     partial_model_weights_pointer = _get_pointer(partial_model_weights)
@@ -131,6 +132,9 @@ def insert_slices_partial(partial_model, partial_model_weights, full_model_shape
     slice_weights_pointer = _get_pointer(slice_weights)
     rotations_pointer = _get_pointer(rotations)
     coordinates_pointer = _get_pointer(coordinates)
+    print("{0} {1} {2}".format(full_model_shape[2], partial_model_corner[2], partial_model_corner[2]+partial_model.shape[2]))
+    print("{0} {1} {2}".format(full_model_shape[1], partial_model_corner[1], partial_model_corner[1]+partial_model.shape[1]))
+    print("{0} {1} {2}".format(full_model_shape[0], partial_model_corner[0], partial_model_corner[0]+partial_model.shape[0]))
     emc_cuda.cuda_insert_slices_partial(partial_model_pointer, partial_model_weights_pointer,
                                         full_model_shape[2], partial_model_corner[2], partial_model_corner[2]+partial_model.shape[2],
                                         full_model_shape[1], partial_model_corner[1], partial_model_corner[1]+partial_model.shape[1],
@@ -138,7 +142,7 @@ def insert_slices_partial(partial_model, partial_model_weights, full_model_shape
                                         slices_pointer, slices.shape[2], slices.shape[1],
                                         slice_weights_pointer,
                                         rotations_pointer, number_of_rotations,
-                                        coordinates_pointer)
+                                        coordinates_pointer, interpolation_int)
     
 def update_slices(slices, patterns, responsabilities):
     if len(patterns.shape) != 3: raise ValueError("patterns must be a 3D array")
