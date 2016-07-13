@@ -2,6 +2,8 @@ import emc_cuda
 import afnumpy
 
 _MAX_PHOTON_COUNT = 100
+_INTERPOLATION = {"nearest_neighbour": 0,
+                  "linear": 1}
 
 def _get_pointer(array):
     if array.dtype == afnumpy.float32:
@@ -74,7 +76,7 @@ def get_slice(model, rotation, coordinates):
                                coordinates_pointer)
     return this_slice
     
-def insert_slices(model, model_weights, slices, slice_weights, rotations, coordinates):
+def insert_slices(model, model_weights, slices, slice_weights, rotations, coordinates, interpolation="linear"):
     if len(slices) != len(rotations):
         raise ValueError("slices and rotations must be of the same length.")
     if len(slices) != len(slice_weights):
@@ -90,6 +92,8 @@ def insert_slices(model, model_weights, slices, slice_weights, rotations, coordi
     if len(coordinates.shape) != 3 or coordinates.shape[0] != 3 or coordinates.shape[1:] != slices.shape[1:]:
         raise ValueError("coordinates must be 3xXxY array where X and Y are the dimensions of the slices.")
 
+    interpolation_int = _INTERPOLATION[interpolation]
+
     number_of_rotations = len(rotations)
     model_pointer = _get_pointer(model)
     model_weights_pointer = _get_pointer(model_weights)
@@ -102,8 +106,40 @@ def insert_slices(model, model_weights, slices, slice_weights, rotations, coordi
                                 slices_pointer, slices.shape[2], slices.shape[1],
                                 slice_weights_pointer,
                                 rotations_pointer, number_of_rotations,
-                                coordinates_pointer)
+                                coordinates_pointer, interpolation_int)
 
+def insert_slices_partial(partial_model, partial_model_weights, full_model_shape, partial_model_corner, slices, slice_weights, rotations, coordinates):
+    if len(slices) != len(rotations):
+        raise ValueError("slices and rotations must be of the same length.")
+    if len(slices) != len(slice_weights):
+        raise ValueError("slices and slice_weights must be of the same length.")
+    if len(slice_weights.shape) != 1:
+        raise ValueError("slice_weights must be one dimensional.")
+    if len(partial_model.shape) != 3 or partial_model.shape != partial_model_weights.shape:
+        raise ValueError("partial_model and partial_model_weights must be 3D arrays of the same shape")
+    if len(slices.shape) != 3:
+        raise ValueError("Slices must be a 3D array.")
+    if len(rotations.shape) != 2 or rotations.shape[1] != 4:
+        raise ValueError("rotations must be a nx4 array.")
+    if len(coordinates.shape) != 3 or coordinates.shape[0] != 3 or coordinates.shape[1:] != slices.shape[1:]:
+        raise ValueError("coordinates must be 3xXxY array where X and Y are the dimensions of the slices.")
+
+    number_of_rotations = len(rotations)
+    partial_model_pointer = _get_pointer(partial_model)
+    partial_model_weights_pointer = _get_pointer(partial_model_weights)
+    slices_pointer = _get_pointer(slices)
+    slice_weights_pointer = _get_pointer(slice_weights)
+    rotations_pointer = _get_pointer(rotations)
+    coordinates_pointer = _get_pointer(coordinates)
+    emc_cuda.cuda_insert_slices_partial(partial_model_pointer, partial_model_weights_pointer,
+                                        full_model_shape[2], partial_model_corner[2], partial_model_corner[2]+partial_model.shape[2],
+                                        full_model_shape[1], partial_model_corner[1], partial_model_corner[1]+partial_model.shape[1],
+                                        full_model_shape[0], partial_model_corner[0], partial_model_corner[0]+partial_model.shape[0],
+                                        slices_pointer, slices.shape[2], slices.shape[1],
+                                        slice_weights_pointer,
+                                        rotations_pointer, number_of_rotations,
+                                        coordinates_pointer)
+    
 def update_slices(slices, patterns, responsabilities):
     if len(patterns.shape) != 3: raise ValueError("patterns must be a 3D array")
     if len(slices.shape) != 3: raise ValueError("slices must be a 3D array.")
