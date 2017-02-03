@@ -7,9 +7,9 @@ _INTERPOLATION = {"nearest_neighbour": 0,
 
 def _get_pointer(array):
     if array.dtype == afnumpy.float32:
-        return emc_cuda.int_to_float_pointer(array.d_array.device_ptr())
+        return emc_cuda.int_to_float_pointer(array.d_array.device_ptr() + 4*array.d_array.offset())
     elif array.dtype == afnumpy.int32:
-        return emc_cuda.int_to_int_pointer(array.d_array.device_ptr())
+        return emc_cuda.int_to_int_pointer(array.d_array.device_ptr() + 4*array.d_array.offset())
     else:
         raise ValueError("_get_pointer received argument with unrecognized dtype: {0}".format(array.dtype))
 
@@ -31,7 +31,7 @@ def masked_set(array, mask, value):
     emc_cuda.masked_set(array_pointer, mask_pointer, size, value)
 
 def equivalent_sigma(number_of_pixels):
-    return 1./numpy.sqrt(number_of_pixels)
+    return 1./afnumpy.sqrt(number_of_pixels)
 
 def expand_model(model, slices, rotations, coordinates):
     if len(slices) != len(rotations):
@@ -132,9 +132,6 @@ def insert_slices_partial(partial_model, partial_model_weights, full_model_shape
     slice_weights_pointer = _get_pointer(slice_weights)
     rotations_pointer = _get_pointer(rotations)
     coordinates_pointer = _get_pointer(coordinates)
-    print("{0} {1} {2}".format(full_model_shape[2], partial_model_corner[2], partial_model_corner[2]+partial_model.shape[2]))
-    print("{0} {1} {2}".format(full_model_shape[1], partial_model_corner[1], partial_model_corner[1]+partial_model.shape[1]))
-    print("{0} {1} {2}".format(full_model_shape[0], partial_model_corner[0], partial_model_corner[0]+partial_model.shape[0]))
     emc_cuda.cuda_insert_slices_partial(partial_model_pointer, partial_model_weights_pointer,
                                         full_model_shape[2], partial_model_corner[2], partial_model_corner[2]+partial_model.shape[2],
                                         full_model_shape[1], partial_model_corner[1], partial_model_corner[1]+partial_model.shape[1],
@@ -173,7 +170,7 @@ def calculate_responsabilities(patterns, slices, responsabilities, sigma):
 def _log_factorial_table(max_value):
     if max_value > _MAX_PHOTON_COUNT:
         raise ValueError("Poisson values can not be used with photon counts higher than {0}".format(_MAX_PHOTON_COUNT))
-    log_factorial_table = afnumpy.zeros(max_value+1, dtype="float32")
+    log_factorial_table = afnumpy.zeros(int(max_value+1), dtype="float32")
     log_factorial_table[0] = 0.
     for i in range(1, int(max_value+1)):
         log_factorial_table[i] = log_factorial_table[i-1] + afnumpy.log(i)
