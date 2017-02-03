@@ -293,24 +293,43 @@ def calculate_scaling_poisson(patterns, slices, scaling):
 
 def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
     pixels_to_im = pixel_size/detector_distance/wavelength
-    x0_pixels = afnumpy.arange(image_shape[0], dtype="float32") - image_shape[0]/2 + 0.5
-    x1_pixels = afnumpy.arange(image_shape[1], dtype="float32") - image_shape[1]/2 + 0.5
-    x0 = x0_pixels*pixels_to_im
-    x1 = x1_pixels*pixels_to_im
-    r_pixels = afnumpy.sqrt(x0_pixels[:, afnumpy.newaxis]**2 + x1_pixels[afnumpy.newaxis, :]**2)
+    x_pixels = afnumpy.arange(image_shape[0], dtype="float32") - image_shape[1]/2 + 0.5
+    y_pixels = afnumpy.arange(image_shape[1], dtype="float32") - image_shape[0]/2 + 0.5
+    x = x_pixels*pixels_to_im
+    y = y_pixels*pixels_to_im
+    r_pixels = afnumpy.sqrt(x_pixels[afnumpy.newaxis, :]**2 + y_pixels[:, afnumpy.newaxis]**2)
     theta = afnumpy.arctan(r_pixels*pixel_size / detector_distance)
-    x2 = 1./wavelength*(1 - afnumpy.cos(theta))
-    x2_pixels = x2/pixels_to_im
+    z = -1./wavelength*(1 - afnumpy.cos(theta))
+    z_pixels = z/pixels_to_im
 
-    x0_2d, x1_2d = afnumpy.meshgrid(x0_pixels, x1_pixels, indexing="ij")
+    y_2d, x_2d = afnumpy.meshgrid(y_pixels, x_pixels, indexing="ij")
+    #x_2d, y_2d = afnumpy.meshgrid(x_pixels, y_pixels, indexing="ij")
     output_coordinates = afnumpy.zeros((3, ) + image_shape, dtype="float32")
-    #return output_coordinates, x0_2d
-    # print "output_coordinates.shape = {0}".format(str(type(output_coordinates)))
-    # print "x0_2d.shape = {0}".format(str(type(x0_2d)))
-    output_coordinates[0, :, :] = x0_2d
-    output_coordinates[1, :, :] = x1_2d
-    output_coordinates[2, :, :] = x2_pixels
+    output_coordinates[0, :, :] = x_2d
+    output_coordinates[1, :, :] = y_2d
+    output_coordinates[2, :, :] = z_pixels
     return output_coordinates
+    
+# def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
+#     pixels_to_im = pixel_size/detector_distance/wavelength
+#     x0_pixels = afnumpy.arange(image_shape[0], dtype="float32") - image_shape[0]/2 + 0.5
+#     x1_pixels = afnumpy.arange(image_shape[1], dtype="float32") - image_shape[1]/2 + 0.5
+#     x0 = x0_pixels*pixels_to_im
+#     x1 = x1_pixels*pixels_to_im
+#     r_pixels = afnumpy.sqrt(x0_pixels[:, afnumpy.newaxis]**2 + x1_pixels[afnumpy.newaxis, :]**2)
+#     theta = afnumpy.arctan(r_pixels*pixel_size / detector_distance)
+#     x2 = 1./wavelength*(1 - afnumpy.cos(theta))
+#     x2_pixels = x2/pixels_to_im
+
+#     x0_2d, x1_2d = afnumpy.meshgrid(x0_pixels, x1_pixels, indexing="ij")
+#     output_coordinates = afnumpy.zeros((3, ) + image_shape, dtype="float32")
+#     #return output_coordinates, x0_2d
+#     # print "output_coordinates.shape = {0}".format(str(type(output_coordinates)))
+#     # print "x0_2d.shape = {0}".format(str(type(x0_2d)))
+#     output_coordinates[0, :, :] = x0_2d
+#     output_coordinates[1, :, :] = x1_2d
+#     output_coordinates[2, :, :] = x2_pixels
+#     return output_coordinates
 
 def rotate_model(model, rotated_model, rotation):
     rotation = afnumpy.array(rotation, dtype="float32")

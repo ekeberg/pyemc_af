@@ -19,9 +19,9 @@ void cuda_insert_slices(float *const model, float *const model_weights,
 			const float *const coordinates, const int interpolation);
 
 void cuda_insert_slices_partial(float *const model, float *const model_weights,
-				const int model_x_tot, const int model_x_max, const int model_x_min,
-				const int model_y_tot, const int model_y_max, const int model_y_min,
-				const int model_z_tot, const int model_z_max, const int model_z_min,
+				const int model_x_tot, const int model_x_min, const int model_x_max,
+				const int model_y_tot, const int model_y_min, const int model_y_max,
+				const int model_z_tot, const int model_z_min, const int model_z_max,
 				const float *const slices, const int image_x, const int image_y,
 				const float *const slice_weights,
 				const float *const rotations, const int number_of_rotations,

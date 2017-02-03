@@ -100,13 +100,13 @@ __device__ void device_interpolate_get_coordinate_weight(const float coordinate,
   *low_weight = ceil(coordinate) - coordinate;
   *high_weight = 1.-*low_weight;
   if (*low_coordinate < -1) {
-    *out_of_range = 0.;
+    *out_of_range = 1;
   } else if (*low_coordinate == -1) {
     *low_weight = 0.;
   } else if (*low_coordinate == side-1) {
     *high_weight = 0.;
   } else if (*low_coordinate > side-1) {
-    *out_of_range = 0.;
+    *out_of_range = 1;
   }
 }
 
@@ -264,9 +264,9 @@ __device__ void device_model_set_nn(float *const model, float *const model_weigh
 				    const float coordinate_x, const float coordinate_y, const float coordinate_z,
 				    const float value, const float value_weight)
 {
-  int index_x = (int) (coordinate_x -0.5);
-  int index_y = (int) (coordinate_y -0.5);
-  int index_z = (int) (coordinate_z -0.5);
+  int index_x = (int) (coordinate_x + 0.5);
+  int index_y = (int) (coordinate_y + 0.5);
+  int index_z = (int) (coordinate_z + 0.5);
   if (index_x >= 0 && index_x < model_x &&
       index_y >= 0 && index_y < model_y &&
       index_z >= 0 && index_z < model_y) {
@@ -380,7 +380,7 @@ __device__ void device_insert_slice_partial(float *const model, float *const mod
 
 	if (interpolation == 0) {
 	  device_model_set_nn(model, model_weights, model_x_max-model_x_min, model_y_max-model_y_min, model_z_max-model_z_min,
-			   new_x-(float)model_x_min, new_y-(float)model_y_min, new_z-(float)model_z_min, slice[y*image_x+x], slice_weight);
+			      new_x-(float)model_x_min, new_y-(float)model_y_min, new_z-(float)model_z_min, slice[y*image_x+x], slice_weight);
 	} else {
 	  device_model_set(model, model_weights, model_x_max-model_x_min, model_y_max-model_y_min, model_z_max-model_z_min,
 			   new_x-(float)model_x_min, new_y-(float)model_y_min, new_z-(float)model_z_min, slice[y*image_x+x], slice_weight);
@@ -407,9 +407,9 @@ __global__ void kernel_insert_slices_partial(float *const model, float *const mo
 
 
 void cuda_insert_slices_partial(float *const model, float *const model_weights,
-				const int model_x_tot, const int model_x_max, const int model_x_min,
-				const int model_y_tot, const int model_y_max, const int model_y_min,
-				const int model_z_tot, const int model_z_max, const int model_z_min,
+				const int model_x_tot, const int model_x_min, const int model_x_max,
+				const int model_y_tot, const int model_y_min, const int model_y_max,
+				const int model_z_tot, const int model_z_min, const int model_z_max,
 				const float *const slices, const int image_x, const int image_y,
 				const float *const slice_weights,
 				const float *const rotations, const int number_of_rotations,
