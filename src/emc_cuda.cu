@@ -269,7 +269,7 @@ __device__ void device_model_set_nn(float *const model, float *const model_weigh
   int index_z = (int) (coordinate_z + 0.5);
   if (index_x >= 0 && index_x < model_x &&
       index_y >= 0 && index_y < model_y &&
-      index_z >= 0 && index_z < model_y) {
+      index_z >= 0 && index_z < model_z) {
     atomicAdd(&model[model_x*model_y*index_z + model_x*index_y + index_x],
 	      value_weight*value);
     atomicAdd(&model_weights[model_x*model_y*index_z + model_x*index_y + index_x],
@@ -369,6 +369,16 @@ __device__ void device_insert_slice_partial(float *const model, float *const mod
   float m21 = 2.0f*rotation[2]*rotation[3] + 2.0f*rotation[0]*rotation[1];
   float m22 = rotation[0]*rotation[0] - rotation[1]*rotation[1] - rotation[2]*rotation[2] + rotation[3]*rotation[3];
 
+  if (blockIdx.x == 0 && threadIdx.x == 0) {
+    printf("inside kernel\n");
+    /*
+    printf("%i %i %i\n", model_x_tot, model_x_min, model_x_max);
+    printf("%i %i %i\n", model_y_tot, model_y_min, model_y_max);
+    printf("%i %i %i\n", model_z_tot, model_z_min, model_z_max);
+    */
+    printf("%i %i %i\n", model_x_max-model_x_min, model_y_max-model_y_min, model_z_max-model_z_min);
+  }
+  
   float new_x, new_y, new_z;
   for (int x = 0; x < image_x; x++) {
     for (int y = threadIdx.x; y < image_y; y+=blockDim.x) {
@@ -377,6 +387,11 @@ __device__ void device_insert_slice_partial(float *const model, float *const mod
 	new_x = m00*coordinates_0[y*image_x+x] + m01*coordinates_1[y*image_x+x] + m02*coordinates_2[y*image_x+x] + model_x_tot/2.0 - 0.5;
 	new_y = m10*coordinates_0[y*image_x+x] + m11*coordinates_1[y*image_x+x] + m12*coordinates_2[y*image_x+x] + model_y_tot/2.0 - 0.5;
 	new_z = m20*coordinates_0[y*image_x+x] + m21*coordinates_1[y*image_x+x] + m22*coordinates_2[y*image_x+x] + model_z_tot/2.0 - 0.5;
+
+	if (blockIdx.x == 0 && x == 10 && y == 10) {
+	  printf("%g %g %g\n", new_x, new_y, new_z);
+	  printf("%g %g %g\n", new_x-(float)model_x_min, new_y-(float)model_y_min, new_z-(float)model_z_min);
+	}
 
 	if (interpolation == 0) {
 	  device_model_set_nn(model, model_weights, model_x_max-model_x_min, model_y_max-model_y_min, model_z_max-model_z_min,

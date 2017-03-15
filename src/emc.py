@@ -292,22 +292,25 @@ def calculate_scaling_poisson(patterns, slices, scaling):
     emc_cuda.cuda_calculate_scaling_poisson(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0], afnumpy.prod(slices[1:]), scaling_pointer)
 
 def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
-    pixels_to_im = pixel_size/detector_distance/wavelength
-    x_pixels = afnumpy.arange(image_shape[0], dtype="float32") - image_shape[1]/2 + 0.5
-    y_pixels = afnumpy.arange(image_shape[1], dtype="float32") - image_shape[0]/2 + 0.5
-    x = x_pixels*pixels_to_im
-    y = y_pixels*pixels_to_im
-    r_pixels = afnumpy.sqrt(x_pixels[afnumpy.newaxis, :]**2 + y_pixels[:, afnumpy.newaxis]**2)
-    theta = afnumpy.arctan(r_pixels*pixel_size / detector_distance)
-    z = -1./wavelength*(1 - afnumpy.cos(theta))
-    z_pixels = z/pixels_to_im
+    x0_pixels_1d = _numpy.arange(image_shape[0]) - image_shape[0]/2. + 0.5
+    x1_pixels_1d = _numpy.arange(image_shape[1]) - image_shape[1]/2. + 0.5
+    x0_pixels, x1_pixels = _numpy.meshgrid(x0_pixels_1d, x1_pixels_1d, indexing="ij")
+    x0_meters = x0_pixels*pixel_size
+    x1_meters = x1_pixels*pixel_size
+    #radius_meters = x0_meters[:, _numpy.newaxis]**2 + x1_meters[_numpy.newaxis, :]**2
+    radius_meters = _numpy.sqrt(x0_meters**2 + x1_meters**2)
 
-    y_2d, x_2d = afnumpy.meshgrid(y_pixels, x_pixels, indexing="ij")
-    #x_2d, y_2d = afnumpy.meshgrid(x_pixels, y_pixels, indexing="ij")
-    output_coordinates = afnumpy.zeros((3, ) + image_shape, dtype="float32")
-    output_coordinates[0, :, :] = x_2d
-    output_coordinates[1, :, :] = y_2d
-    output_coordinates[2, :, :] = z_pixels
+    scattering_angle = _numpy.arctan(radius_meters / detector_distance)
+    x2 = 1./wavelength*(1. - _numpy.cos(scattering_angle))
+    radius_fourier = _numpy.sqrt(1./wavelength**2 - (1./wavelength - x2)**2)
+
+    x0 = x0_meters * radius_fourier / radius_meters
+    x1 = x1_meters * radius_fourier / radius_meters
+
+    output_coordinates = _numpy.zeros((_numpy.prod(image_shape), 3))
+    output_coordinates[:, 0] = x0.flatten()
+    output_coordinates[:, 1] = x1.flatten()
+    output_coordinates[:, 2] = x2.flatten()
     return output_coordinates
     
 # def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
