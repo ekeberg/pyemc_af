@@ -1,7 +1,7 @@
 import emc_cuda
 import afnumpy
 
-_MAX_PHOTON_COUNT = 100
+_MAX_PHOTON_COUNT = 150
 _INTERPOLATION = {"nearest_neighbour": 0,
                   "linear": 1}
 
@@ -291,7 +291,39 @@ def calculate_scaling_poisson(patterns, slices, scaling):
     scaling_pointer = emc_cuda.int_to_float_pointer(scaling.d_array.device_ptr())
     emc_cuda.cuda_calculate_scaling_poisson(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0], afnumpy.prod(slices[1:]), scaling_pointer)
 
+
+# Attempt to fix for high angles
 def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
+    # print("Using new ewald_coordinates")
+    x_pixels_1d = afnumpy.arange(image_shape[1]) - image_shape[0]/2. + 0.5
+    y_pixels_1d = afnumpy.arange(image_shape[0]) - image_shape[1]/2. + 0.5
+    y_pixels, x_pixels = afnumpy.meshgrid(y_pixels_1d, x_pixels_1d, indexing="ij")
+    x_meters = x_pixels*pixel_size
+    y_meters = y_pixels*pixel_size
+    #radius_meters = x0_meters[:, _numpy.newaxis]**2 + x1_meters[_numpy.newaxis, :]**2
+    radius_meters = afnumpy.sqrt(x_meters**2 + y_meters**2)
+
+    scattering_angle = afnumpy.arctan(radius_meters / detector_distance)
+    z = -1./wavelength*(1. - afnumpy.cos(scattering_angle))
+    radius_fourier = afnumpy.sqrt(1./wavelength**2 - (1./wavelength - abs(z))**2)
+
+    x = x_meters * radius_fourier / radius_meters
+    y = y_meters * radius_fourier / radius_meters
+
+    output_coordinates = afnumpy.zeros((3, ) + image_shape, dtype=afnumpy.float32)
+    output_coordinates[0, :, :] = afnumpy.float32(x)
+    output_coordinates[1, :, :] = afnumpy.float32(y)
+    output_coordinates[2, :, :] = afnumpy.float32(z)
+
+    # Rescale so that edge pixels match.
+    furthest_edge_coordinate = afnumpy.sqrt(x[0, image_shape[1]/2]**2 + y[0, image_shape[1]/2]**2 + z[0, image_shape[1]/2]**2)
+    rescale_factor = image_shape[0]/2./furthest_edge_coordinate
+    output_coordinates *= rescale_factor
+    
+    return output_coordinates
+
+# Old standard
+def ewald_coordinates_old(image_shape, wavelength, detector_distance, pixel_size):
     pixels_to_im = pixel_size/detector_distance/wavelength
     x_pixels = afnumpy.arange(image_shape[0], dtype="float32") - image_shape[1]/2 + 0.5
     y_pixels = afnumpy.arange(image_shape[1], dtype="float32") - image_shape[0]/2 + 0.5
