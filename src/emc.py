@@ -1,7 +1,7 @@
 import emc_cuda
 import afnumpy
 
-_MAX_PHOTON_COUNT = 100
+_MAX_PHOTON_COUNT = 150
 _INTERPOLATION = {"nearest_neighbour": 0,
                   "linear": 1}
 
@@ -291,48 +291,34 @@ def calculate_scaling_poisson(patterns, slices, scaling):
     scaling_pointer = emc_cuda.int_to_float_pointer(scaling.d_array.device_ptr())
     emc_cuda.cuda_calculate_scaling_poisson(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0], afnumpy.prod(slices[1:]), scaling_pointer)
 
+
+# Attempt to fix for high angles
 def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
-    x0_pixels_1d = _numpy.arange(image_shape[0]) - image_shape[0]/2. + 0.5
-    x1_pixels_1d = _numpy.arange(image_shape[1]) - image_shape[1]/2. + 0.5
-    x0_pixels, x1_pixels = _numpy.meshgrid(x0_pixels_1d, x1_pixels_1d, indexing="ij")
-    x0_meters = x0_pixels*pixel_size
-    x1_meters = x1_pixels*pixel_size
-    #radius_meters = x0_meters[:, _numpy.newaxis]**2 + x1_meters[_numpy.newaxis, :]**2
-    radius_meters = _numpy.sqrt(x0_meters**2 + x1_meters**2)
+    x_pixels_1d = afnumpy.arange(image_shape[1]) - image_shape[1]/2. + 0.5
+    y_pixels_1d = afnumpy.arange(image_shape[0]) - image_shape[0]/2. + 0.5
+    y_pixels, x_pixels = afnumpy.meshgrid(y_pixels_1d, x_pixels_1d, indexing="ij")
+    x_meters = x_pixels*pixel_size
+    y_meters = y_pixels*pixel_size
+    radius_meters = afnumpy.sqrt(x_meters**2 + y_meters**2)
 
-    scattering_angle = _numpy.arctan(radius_meters / detector_distance)
-    x2 = 1./wavelength*(1. - _numpy.cos(scattering_angle))
-    radius_fourier = _numpy.sqrt(1./wavelength**2 - (1./wavelength - x2)**2)
+    scattering_angle = afnumpy.arctan(radius_meters / detector_distance)
+    z = -1./wavelength*(1. - afnumpy.cos(scattering_angle))
+    radius_fourier = afnumpy.sqrt(1./wavelength**2 - (1./wavelength - abs(z))**2)
 
-    x0 = x0_meters * radius_fourier / radius_meters
-    x1 = x1_meters * radius_fourier / radius_meters
+    x = x_meters * radius_fourier / radius_meters
+    y = y_meters * radius_fourier / radius_meters
 
-    output_coordinates = _numpy.zeros((_numpy.prod(image_shape), 3))
-    output_coordinates[:, 0] = x0.flatten()
-    output_coordinates[:, 1] = x1.flatten()
-    output_coordinates[:, 2] = x2.flatten()
-    return output_coordinates
+    output_coordinates = afnumpy.zeros((3, ) + image_shape, dtype=afnumpy.float32)
+    output_coordinates[0, :, :] = afnumpy.float32(x)
+    output_coordinates[1, :, :] = afnumpy.float32(y)
+    output_coordinates[2, :, :] = afnumpy.float32(z)
+
+    # Rescale so that edge pixels match.
+    furthest_edge_coordinate = afnumpy.sqrt(x[0, image_shape[1]/2]**2 + y[0, image_shape[1]/2]**2 + z[0, image_shape[1]/2]**2)
+    rescale_factor = image_shape[0]/2./furthest_edge_coordinate
+    output_coordinates *= rescale_factor
     
-# def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
-#     pixels_to_im = pixel_size/detector_distance/wavelength
-#     x0_pixels = afnumpy.arange(image_shape[0], dtype="float32") - image_shape[0]/2 + 0.5
-#     x1_pixels = afnumpy.arange(image_shape[1], dtype="float32") - image_shape[1]/2 + 0.5
-#     x0 = x0_pixels*pixels_to_im
-#     x1 = x1_pixels*pixels_to_im
-#     r_pixels = afnumpy.sqrt(x0_pixels[:, afnumpy.newaxis]**2 + x1_pixels[afnumpy.newaxis, :]**2)
-#     theta = afnumpy.arctan(r_pixels*pixel_size / detector_distance)
-#     x2 = 1./wavelength*(1 - afnumpy.cos(theta))
-#     x2_pixels = x2/pixels_to_im
-
-#     x0_2d, x1_2d = afnumpy.meshgrid(x0_pixels, x1_pixels, indexing="ij")
-#     output_coordinates = afnumpy.zeros((3, ) + image_shape, dtype="float32")
-#     #return output_coordinates, x0_2d
-#     # print "output_coordinates.shape = {0}".format(str(type(output_coordinates)))
-#     # print "x0_2d.shape = {0}".format(str(type(x0_2d)))
-#     output_coordinates[0, :, :] = x0_2d
-#     output_coordinates[1, :, :] = x1_2d
-#     output_coordinates[2, :, :] = x2_pixels
-#     return output_coordinates
+    return output_coordinates
 
 def rotate_model(model, rotated_model, rotation):
     rotation = afnumpy.array(rotation, dtype="float32")
