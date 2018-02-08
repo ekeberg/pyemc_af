@@ -141,17 +141,30 @@ def insert_slices_partial(partial_model, partial_model_weights, full_model_shape
                                         rotations_pointer, number_of_rotations,
                                         coordinates_pointer, interpolation_int)
     
-def update_slices(slices, patterns, responsabilities):
+def update_slices(slices, patterns, responsabilities, scalings=None):
     if len(patterns.shape) != 3: raise ValueError("patterns must be a 3D array")
     if len(slices.shape) != 3: raise ValueError("slices must be a 3D array.")
     if patterns.shape[1:] != slices.shape[1:]: raise ValueError("patterns and images must be the same size 2D images")
     if len(responsabilities.shape) != 2 or slices.shape[0] != responsabilities.shape[0] or patterns.shape[0] != responsabilities.shape[1]:
         raise ValueError("responsabilities must have shape nrotations x npatterns")
+    if scalings is not None and scalings.shape != responsabilities.shape:
+        raise ValueError("Scalings must have the same shape as responsabilities")
+
     slices_pointer = _get_pointer(slices)
     patterns_pointer = _get_pointer(patterns)
     responsabilities_pointer = _get_pointer(responsabilities)
-    emc_cuda.cuda_update_slices(slices_pointer, slices.shape[0], patterns_pointer, patterns.shape[0], patterns.shape[2], patterns.shape[1], responsabilities_pointer)
-    
+    if scalings is None:
+        emc_cuda.cuda_update_slices(slices_pointer, slices.shape[0],
+                                    patterns_pointer, patterns.shape[0],
+                                    patterns.shape[2], patterns.shape[1],
+                                    responsabilities_pointer)
+    else:
+        scalings_pointer = _get_pointer(scalings)
+        emc_cuda.cuda_update_slices_scaling(slices_pointer, slices.shape[0],
+                                            patterns_pointer, patterns.shape[0],
+                                            patterns.shape[2], patterns.shape[1],
+                                            responsabilities_pointer, scalings_pointer)
+        
     
 def calculate_responsabilities(patterns, slices, responsabilities, sigma):
     if len(patterns.shape) != 3: raise ValueError("patterns must be a 3D array")
@@ -289,7 +302,8 @@ def calculate_scaling_poisson(patterns, slices, scaling):
     patterns_pointer = emc_cuda.int_to_float_pointer(patterns.d_array.device_ptr())
     slices_pointer = emc_cuda.int_to_float_pointer(slices.d_array.device_ptr())
     scaling_pointer = emc_cuda.int_to_float_pointer(scaling.d_array.device_ptr())
-    emc_cuda.cuda_calculate_scaling_poisson(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0], afnumpy.prod(slices[1:]), scaling_pointer)
+    emc_cuda.cuda_calculate_scaling_poisson(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0],
+                                            afnumpy.prod(slices.shape[1:]), scaling_pointer)
 
 
 # Attempt to fix for high angles

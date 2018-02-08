@@ -439,7 +439,8 @@ void cuda_insert_slices_partial(float *const model, float *const model_weights,
   cudaErrorCheck(cudaDeviceSynchronize());
 }
 
-__global__ void kernel_update_slices(float *const slices, const float *const patterns, const int number_of_patterns, const int number_of_pixels,
+__global__ void kernel_update_slices(float *const slices, const float *const patterns,
+				     const int number_of_patterns, const int number_of_pixels,
 				     const float *const responsabilities)
 {
   const int index_rotation = blockIdx.x;
@@ -462,12 +463,52 @@ __global__ void kernel_update_slices(float *const slices, const float *const pat
   }
 }
 
-void cuda_update_slices(float *const slices, const int number_of_rotations, const float *const patterns, const int number_of_patterns,
-			const int image_x, const int image_y, const float *const responsabilities)
+void cuda_update_slices(float *const slices, const int number_of_rotations,
+			const float *const patterns, const int number_of_patterns,
+			const int image_x, const int image_y,
+			const float *const responsabilities)
 {
   const int nblocks = number_of_rotations;
   const int nthreads = NTHREADS;
   kernel_update_slices<<<nblocks, nthreads>>>(slices, patterns, number_of_patterns, image_x*image_y, responsabilities);
+  cudaErrorCheck(cudaPeekAtLastError());
+  cudaErrorCheck(cudaDeviceSynchronize());
+}
+
+__global__ void kernel_update_slices_scaling(float *const slices, const float *const patterns,
+					     const int number_of_patterns, const int number_of_pixels,
+					     const float *const responsabilities, const float *const scaling)
+{
+  const int index_rotation = blockIdx.x;
+  float sum;
+  float weight;
+  for (int pixel_index = threadIdx.x; pixel_index < number_of_pixels; pixel_index += blockDim.x) {
+    sum = 0.;
+    weight = 0.;
+    for (int pattern_index = 0; pattern_index < number_of_patterns; pattern_index++) {
+      if (patterns[pattern_index*number_of_pixels + pixel_index] >= 0.) {
+	sum += (patterns[pattern_index*number_of_pixels + pixel_index] *
+		scaling[index_rotation*number_of_patterns + pattern_index] *
+		responsabilities[index_rotation*number_of_patterns + pattern_index]);
+	weight += responsabilities[index_rotation*number_of_patterns + pattern_index];
+      }
+    }
+    if (weight > 0.) {
+      slices[index_rotation*number_of_pixels + pixel_index] = sum / weight;
+    } else {
+      slices[index_rotation*number_of_pixels + pixel_index] = -1.;
+    }
+  }
+}
+
+void cuda_update_slices_scaling(float *const slices, const int number_of_rotations,
+				const float *const patterns, const int number_of_patterns,
+				const int image_x, const int image_y,
+				const float *const responsabilities, const float *const scaling)
+{
+  const int nblocks = number_of_rotations;
+  const int nthreads = NTHREADS;
+  kernel_update_slices_scaling<<<nblocks, nthreads>>>(slices, patterns, number_of_patterns, image_x*image_y, responsabilities, scaling);
   cudaErrorCheck(cudaPeekAtLastError());
   cudaErrorCheck(cudaDeviceSynchronize());
 }
@@ -665,6 +706,7 @@ __global__ void kernel_calculate_scaling_poisson(const float *const patterns, co
   inblock_reduce(sum_pattern_cache);
 
   if (threadIdx.x == 0) {
+    //printf("scaling[%d, %d] = %g / %g\n", index_slice, index_pattern, sum_slice_cache[0], sum_pattern_cache[0]);
     scaling[index_slice*number_of_patterns + index_pattern] = sum_slice_cache[0] / sum_pattern_cache[0];
   }
 }

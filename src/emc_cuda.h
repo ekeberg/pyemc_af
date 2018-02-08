@@ -27,8 +27,15 @@ void cuda_insert_slices_partial(float *const model, float *const model_weights,
 				const float *const rotations, const int number_of_rotations,
 				const float *const coordinates, const int interpolation);
 
-void cuda_update_slices(float *const slices, const int number_of_rotations, const float *const patterns, const int number_of_patterns,
-			const int image_x, const int image_y, const float *const responsabilities);
+void cuda_update_slices(float *const slices, const int number_of_rotations,
+			const float *const patterns, const int number_of_patterns,
+			const int image_x, const int image_y,
+			const float *const responsabilities);
+
+void cuda_update_slices_scaling(float *const slices, const int number_of_rotations,
+				const float *const patterns, const int number_of_patterns,
+				const int image_x, const int image_y,
+				const float *const responsabilities, const float *const scaling);
 
 void cuda_calculate_responsabilities(const float *const patterns, const int number_of_patterns, const float *const slices, const int number_of_rotations,
 				     const int image_x, const int image_y, float *const responsabilities, const float sigma);
