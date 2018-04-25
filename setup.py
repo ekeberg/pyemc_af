@@ -40,7 +40,11 @@ except AttributeError:
     numpy_include = numpy.get_numpy_include()
 
 ext = Extension("_emc_cuda",
-                sources=["src/emc_cuda_swig_wrap.cpp", "src/emc_cuda.cu"],
+                sources=["src/emc_cuda_swig_wrap.cpp",
+                         "src/emc_cuda.cu",
+                         "src/calculate_responsabilities.cu",
+                         "src/calculate_scaling.cu",
+                         "src/update_slices.cu"],
                 library_dirs=[CUDA["lib64"]],
                 libraries=["cudart"],
                 runtime_library_dirs=[CUDA["lib64"]],

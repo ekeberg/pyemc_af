@@ -1,7 +1,7 @@
 import emc_cuda
 import afnumpy
 
-_MAX_PHOTON_COUNT = 150
+_MAX_PHOTON_COUNT = 1500
 _INTERPOLATION = {"nearest_neighbour": 0,
                   "linear": 1}
 
@@ -205,16 +205,20 @@ def calculate_responsabilities_poisson(patterns, slices, responsabilities, scali
     responsabilities_pointer = _get_pointer(responsabilities)
     log_factorial_table_pointer = _get_pointer(calculate_responsabilities_poisson.log_factorial_table)
     if scalings is None:
-        emc_cuda.cuda_calculate_responsabilities_poisson(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0],
-                                                         slices.shape[2], slices.shape[1], responsabilities_pointer, log_factorial_table_pointer)
+        emc_cuda.cuda_calculate_responsabilities_poisson(patterns_pointer, patterns.shape[0],
+                                                         slices_pointer, slices.shape[0],
+                                                         slices.shape[2], slices.shape[1],
+                                                         responsabilities_pointer, log_factorial_table_pointer)
     else:
         scalings_pointer = _get_pointer(scalings)
-        emc_cuda.cuda_calculate_responsabilities_poisson_scaling(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0],
-                                                                 slices.shape[2], slices.shape[1], scalings_pointer,
-                                                                 responsabilities_pointer, log_factorial_table_pointer)
+        emc_cuda.cuda_calculate_responsabilities_poisson_scaling(patterns_pointer, patterns.shape[0],
+                                                                 slices_pointer, slices.shape[0],
+                                                                 slices.shape[2], slices.shape[1],
+                                                                 scalings_pointer, responsabilities_pointer,
+                                                                 log_factorial_table_pointer)
 calculate_responsabilities_poisson.log_factorial_table = None
         
-def calculate_responsabilities_sparse(patterns, slices, responsabilities):
+def calculate_responsabilities_sparse(patterns, slices, responsabilities, scalings=None):
     if not isinstance(patterns, dict):
         raise ValueError("patterns must be a dictionary containing the keys: indcies, values and start_indices")
     if ("indices" not in patterns or
@@ -230,6 +234,8 @@ def calculate_responsabilities_sparse(patterns, slices, responsabilities):
         raise ValueError("slices must be a 3d array")
     if slices.shape[0] != responsabilities.shape[0]:
         raise ValueError("Responsabilities and slices indicate different number of orientations")
+    if scalings is not None and scalings.shape != responsabilities.shape:
+        raise ValueError("Scalings must have the same shape as responsabilities")
     
     if (calculate_responsabilities_sparse.log_factorial_table is None or
         len(calculate_responsabilities_sparse.log_factorial_table) <= patterns["values"].max()):
@@ -248,20 +254,33 @@ def calculate_responsabilities_sparse(patterns, slices, responsabilities):
     log_factorial_table_pointer = emc_cuda.int_to_float_pointer(calculate_responsabilities_sparse.log_factorial_table.d_array.device_ptr())
     number_of_patterns = len(patterns["start_indices"])-1
     number_of_rotations = len(slices)
-    emc_cuda.cuda_calculate_responsabilities_sparse(patterns_start_indices_pointer,
-                                                    patterns_indices_pointer,
-                                                    patterns_values_pointer,
-                                                    number_of_patterns,
-                                                    slices_pointer,
-                                                    number_of_rotations,
-                                                    slices.shape[2], slices.shape[1],
-                                                    responsabilities_pointer,
-                                                    slice_sums_pointer,
-                                                    log_factorial_table_pointer)
+    if scalings is None:
+        emc_cuda.cuda_calculate_responsabilities_sparse(patterns_start_indices_pointer,
+                                                        patterns_indices_pointer,
+                                                        patterns_values_pointer,
+                                                        number_of_patterns,
+                                                        slices_pointer,
+                                                        number_of_rotations,
+                                                        slices.shape[2], slices.shape[1],
+                                                        responsabilities_pointer,
+                                                        slice_sums_pointer,
+                                                        log_factorial_table_pointer)
+    else:
+        emc_cuda.cuda_calculate_responsabilities_sparse_scaling(patterns_start_indices_pointer,
+                                                                patterns_indices_pointer,
+                                                                patterns_values_pointer,
+                                                                number_of_patterns,
+                                                                slices_pointer,
+                                                                number_of_rotations,
+                                                                slices.shape[2], slices.shape[1],
+                                                                _get_pointer(scalings),
+                                                                responsabilities_pointer,
+                                                                slice_sums_pointer,
+                                                                log_factorial_table_pointer)
 
 calculate_responsabilities_sparse.log_factorial_table = None
 calculate_responsabilities_sparse.slice_sums = None
-def update_slices_sparse(slices, patterns, responsabilities):
+def update_slices_sparse(slices, patterns, responsabilities, scalings=None):
     if (not "indices" in patterns or
         not "values" in patterns or
         not "start_indices" in patterns):
@@ -275,19 +294,38 @@ def update_slices_sparse(slices, patterns, responsabilities):
         raise ValueError("slices must be a 3d array")
     if slices.shape[0] != responsabilities.shape[0]:
         raise ValueError("Responsabilities and slices indicate different number of orientations")
-    patterns_indices_pointer = emc_cuda.int_to_float_pointer(patterns["indices"].d_array.device_ptr())
-    patterns_values_pointer = emc_cuda.int_to_float_pointer(patterns["values"].d_array.device_ptr())
-    patterns_start_indices_pointer = emc_cuda.int_to_float_pointer(patterns["start_indices"].d_array.device_ptr())
-    slices_pointer = emc_cuda.int_to_float_pointer(slices.d_array.device_ptr())
-    responsabilities_pointer = emc_cuda.int_to_float_pointer(responsabilities.d_array.device_ptr())
-    slice_sums_pointer = emc_cuda.int_to_float_pointer(slice_sums.d_array.device_ptr())
-    log_factorial_table_pointer = emc_cuda.int_to_float_pointer(calculate_responsabilities_sparse.slice_sums.d_array.device_ptr())
+    if scalings is not None and scalings.shape != responsabilities.shape:
+        raise ValueError("Scalings must have the same shape as responsabilities")
+    patterns_indices_pointer = _get_pointer(patterns["indices"])
+    patterns_values_pointer = _get_pointer(patterns["values"])
+    patterns_start_indices_pointer = _get_pointer(patterns["start_indices"])
+    slices_pointer = _get_pointer(slices)
+    responsabilities_pointer = _get_pointer(responsabilities)
+    slice_sums_pointer = _get_pointer(calculate_responsabilities_sparse.slice_sums)
     number_of_patterns = len(patterns["start_indices"])-1
     number_of_rotations = len(slices)
-    emc_cuda.cuda_update_slices_sparse(slices_pointer, number_of_rotations, pattern_start_indices_pointer,
-                                       pattern_indices_pointer, pattern_values_pointer, number_of_patterns,
-                                       slices.shape[2], slices.shape[1], responsabilities_pointer)
-    
+    if scalings is None:
+        emc_cuda.cuda_update_slices_sparse(slices_pointer,
+                                           number_of_rotations,
+                                           patterns_start_indices_pointer,
+                                           patterns_indices_pointer,
+                                           patterns_values_pointer,
+                                           number_of_patterns,
+                                           slices.shape[2],
+                                           slices.shape[1],
+                                           responsabilities_pointer)
+    else:
+        emc_cuda.cuda_update_slices_sparse_scaling(slices_pointer,
+                                                   number_of_rotations,
+                                                   patterns_start_indices_pointer,
+                                                   patterns_indices_pointer,
+                                                   patterns_values_pointer,
+                                                   number_of_patterns,
+                                                   slices.shape[2],
+                                                   slices.shape[1],
+                                                   responsabilities_pointer,
+                                                   _get_pointer(scalings))
+
 def calculate_scaling_poisson(patterns, slices, scaling):
     if len(patterns.shape) != 3:
         raise ValueError("Patterns must be a 3D array")
@@ -304,6 +342,35 @@ def calculate_scaling_poisson(patterns, slices, scaling):
     scaling_pointer = emc_cuda.int_to_float_pointer(scaling.d_array.device_ptr())
     emc_cuda.cuda_calculate_scaling_poisson(patterns_pointer, patterns.shape[0], slices_pointer, slices.shape[0],
                                             afnumpy.prod(slices.shape[1:]), scaling_pointer)
+
+def calculate_scaling_poisson_sparse(patterns, slices, scaling):
+    if not isinstance(patterns, dict):
+        raise ValueError("patterns must be a dictionary containing the keys: indcies, values and start_indices")
+    if ("indices" not in patterns or
+        "values" not in patterns or
+        "start_indices" not in patterns):
+        raise ValueError("patterns must contain the keys indcies, values and start_indices")
+    if len(patterns["start_indices"].shape) != 1 or patterns["start_indices"].shape[0] != scaling.shape[1]+1:
+        raise ValueError("start_indices must be a 1d array of length one more than the number of patterns")
+    if len(patterns["indices"].shape) != 1 or len(patterns["values"].shape) != 1 or patterns["indices"].shape != patterns["values"].shape:
+        raise ValueError("indices and values must have the same shape")
+    if len(slices.shape) != 3:
+        raise ValueError("Slices must be a 3D array")
+    if len(scaling.shape) != 2:
+        raise ValueError("Slices must be a 2D array")
+    number_of_patterns = len(patterns["start_indices"])-1
+    if scaling.shape[0] != slices.shape[0] or scaling.shape[1] != number_of_patterns:
+        raise ValueError("scaling must have shape nrotations x npatterns")        
+    slices_pointer = emc_cuda.int_to_float_pointer(slices.d_array.device_ptr())
+    scaling_pointer = emc_cuda.int_to_float_pointer(scaling.d_array.device_ptr())
+    emc_cuda.cuda_calculate_scaling_poisson_sparse(_get_pointer(patterns["start_indices"]),
+                                                   _get_pointer(patterns["indices"]),
+                                                   _get_pointer(patterns["values"]),
+                                                   number_of_patterns,
+                                                   slices_pointer,
+                                                   slices.shape[0],
+                                                   afnumpy.prod(slices.shape[1:]),
+                                                   scaling_pointer)
 
 
 # Attempt to fix for high angles
@@ -355,27 +422,6 @@ def ewald_coordinates_old(image_shape, wavelength, detector_distance, pixel_size
     output_coordinates[1, :, :] = y_2d
     output_coordinates[2, :, :] = z_pixels
     return output_coordinates
-    
-# def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
-#     pixels_to_im = pixel_size/detector_distance/wavelength
-#     x0_pixels = afnumpy.arange(image_shape[0], dtype="float32") - image_shape[0]/2 + 0.5
-#     x1_pixels = afnumpy.arange(image_shape[1], dtype="float32") - image_shape[1]/2 + 0.5
-#     x0 = x0_pixels*pixels_to_im
-#     x1 = x1_pixels*pixels_to_im
-#     r_pixels = afnumpy.sqrt(x0_pixels[:, afnumpy.newaxis]**2 + x1_pixels[afnumpy.newaxis, :]**2)
-#     theta = afnumpy.arctan(r_pixels*pixel_size / detector_distance)
-#     x2 = 1./wavelength*(1 - afnumpy.cos(theta))
-#     x2_pixels = x2/pixels_to_im
-
-#     x0_2d, x1_2d = afnumpy.meshgrid(x0_pixels, x1_pixels, indexing="ij")
-#     output_coordinates = afnumpy.zeros((3, ) + image_shape, dtype="float32")
-#     #return output_coordinates, x0_2d
-#     # print "output_coordinates.shape = {0}".format(str(type(output_coordinates)))
-#     # print "x0_2d.shape = {0}".format(str(type(x0_2d)))
-#     output_coordinates[0, :, :] = x0_2d
-#     output_coordinates[1, :, :] = x1_2d
-#     output_coordinates[2, :, :] = x2_pixels
-#     return output_coordinates
 
 def rotate_model(model, rotated_model, rotation):
     rotation = afnumpy.array(rotation, dtype="float32")
@@ -387,3 +433,4 @@ def rotate_model(model, rotated_model, rotation):
     rotated_model_pointer = emc_cuda.int_to_float_pointer(rotated_model.d_array.device_ptr())
     rotation_pointer = emc_cuda.int_to_float_pointer(rotation.d_array.device_ptr())
     emc_cuda.cuda_rotate_model(model_pointer, rotated_model_pointer, model.shape[2], model.shape[1], model.shape[0], rotation_pointer)
+
