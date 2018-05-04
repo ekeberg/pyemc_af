@@ -25,15 +25,15 @@ def locate_cuda():
     cudaconfig = {"home": home,
                   "nvcc": nvcc,
                   "include": os.path.join(home, "include"),
-                  "lib64": os.path.join(home, "lib64")}
-    print cudaconfig
-    for k, v in cudaconfig.iteritems():
+                  "lib": os.path.join(home, "lib")}
+    print(cudaconfig)
+    for k, v in cudaconfig.items():
         if not os.path.exists(v):
             raise EnvironmentError("The CUDA {0} path could not be located in {1}".format(k, v))
     return cudaconfig
 
 CUDA = locate_cuda()
-print CUDA
+print(CUDA)
 try:
     numpy_include = numpy.get_include()
 except AttributeError:
@@ -45,9 +45,9 @@ ext = Extension("_emc_cuda",
                          "src/calculate_responsabilities.cu",
                          "src/calculate_scaling.cu",
                          "src/update_slices.cu"],
-                library_dirs=[CUDA["lib64"]],
+                library_dirs=[CUDA["lib"]],
                 libraries=["cudart"],
-                runtime_library_dirs=[CUDA["lib64"]],
+                runtime_library_dirs=[CUDA["lib"]],
                 extra_compile_args={"clang": [],
                                     "nvcc": ["--ptxas-options=-v", "-c", "--compiler-options", "'-fPIC'"]},
                                     #"nvcc": ["-arch=sm_20", "--ptxas-options=-v", "-c", "--compiler-options", "'-fPIC'"]},
