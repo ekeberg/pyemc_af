@@ -39,24 +39,34 @@ try:
 except AttributeError:
     numpy_include = numpy.get_numpy_include()
 
-ext = Extension("_emc_cuda",
-                sources=["src/emc_cuda_swig_wrap.cpp",
-                         "src/emc_cuda.cu",
-                         "src/calculate_responsabilities.cu",
-                         "src/calculate_scaling.cu",
-                         "src/update_slices.cu"],
-                library_dirs=[CUDA["lib"]],
-                libraries=["cudart"],
-                runtime_library_dirs=[CUDA["lib"]],
-                extra_compile_args={"clang": [],
-                                    "nvcc": ["--ptxas-options=-v", "-c", "--compiler-options", "'-fPIC'"]},
-                                    #"nvcc": ["-arch=sm_20", "--ptxas-options=-v", "-c", "--compiler-options", "'-fPIC'"]},
-                include_dirs=[numpy_include, CUDA["include"], "src"])
-
 if find_in_path("swig", os.environ["PATH"]):
     subprocess.check_call("swig -python -c++ -o src/emc_cuda_swig_wrap.cpp src/emc_cuda.i", shell=True)
+    subprocess.check_call("swig -python -c++ -o src/emc_cpu_swig_wrap.cpp src/emc_cpu.i", shell=True)
 else:
     raise EnvironmentError("The swig executable was not found in your PATH")
+    
+ext_cuda = Extension("_emc_cuda",
+                     sources=["src/emc_cuda_swig_wrap.cpp",
+                              "src/emc_cuda.cu",
+                              "src/calculate_responsabilities_cuda.cu",
+                              "src/calculate_scaling_cuda.cu",
+                              "src/update_slices_cuda.cu"],
+                     library_dirs=[CUDA["lib"]],
+                     libraries=["cudart"],
+                     runtime_library_dirs=[CUDA["lib"]],
+                     extra_compile_args={"clang": [],
+                                         "nvcc": ["--ptxas-options=-v", "-c", "--compiler-options", "'-fPIC'"]},
+                     #"nvcc": ["-arch=sm_20", "--ptxas-options=-v", "-c", "--compiler-options", "'-fPIC'"]},
+                     include_dirs=[numpy_include, CUDA["include"], "src"])
+
+ext_cpu = Extension("_emc_cpu",
+                    sources=["src/emc_cpu_swig_wrap.cpp",
+                             "src/emc_cpu.cpp",
+                             "src/calculate_responsabilities_cpu.cpp",
+                             "src/calculate_scaling_cpu.cpp",
+                             "src/update_slices_cpu.cpp"],
+                    #extra_compile_args={"clang": []},
+                    include_dirs=[numpy_include, "src"])
 
 def customize_compiler_for_nvcc(self):
     self.src_extensions.append(".cu")
@@ -64,12 +74,19 @@ def customize_compiler_for_nvcc(self):
     super = self._compile
 
     def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):
+        # print("\n\n\n")
+        # print(extra_postargs)
+        # print("\n\n\n")
         if os.path.splitext(src)[1] == ".cu":
             self.set_executable("compiler_so", CUDA["nvcc"])
-            postargs = extra_postargs["nvcc"]
+            postargs = extra_postargs["nvcc"]            
         else:
-            postargs = extra_postargs["clang"]
+            #self.set_executable("compiler_so", "/usr/bin/clang")
+            #postargs = extra_postargs["clang"]
+            postargs = []
+            #pass
         super(obj, src, ext, cc_args, postargs, pp_opts)
+        
         self.compiler_so = default_compiler_so
 
     self._compile = _compile
@@ -84,10 +101,18 @@ class custom_build_ext(build_ext):
 setuptools.setup(name="emc",
                  author="Tomas Ekeberg",
                  version="0.1",
-                 py_modules=["emc", "emc_cuda"],
+                 py_modules=["emc", "emc_cuda", "emc_cpu"],
                  package_dir={"": "src"},
-                 ext_modules=[ext],
+                 ext_modules=[ext_cuda, ext_cpu],
                  cmdclass={"build_ext": custom_build_ext},
                  zip_safe=False)
 
-#os.system("mv build/lib.macosx-10.10-intel-2.7/emc_cuda.so build/lib.macosx-10.10-intel-2.7/_emc_cuda.so")
+# setuptools.setup(name="emc",
+#                  author="Tomas Ekeberg",
+#                  version="0.1",
+#                  py_modules=["emc", "emc_cpu"],
+#                  package_dir={"": "src"},
+#                  ext_modules=[ext_cpu],
+#                  cmdclass={"build_ext": custom_build_ext},
+#                  zip_safe=False)
+

@@ -39,14 +39,14 @@ __global__ void kernel_calculate_responsabilities(const float* const patterns,
   }
 }
 
-void cuda_calculate_responsabilities(const float *const patterns,
-				     const int number_of_patterns,
-				     const float *const slices,
-				     const int number_of_rotations,
-				     const int image_x,
-				     const int image_y,
-				     float *const responsabilities,
-				     const float sigma)
+void calculate_responsabilities(const float *const patterns,
+				const int number_of_patterns,
+				const float *const slices,
+				const int number_of_rotations,
+				const int image_x,
+				const int image_y,
+				float *const responsabilities,
+				const float sigma)
 {
   dim3 nblocks(number_of_patterns, number_of_rotations);
   int nthreads = NTHREADS;
@@ -91,14 +91,14 @@ __global__ void kernel_calculate_responsabilities_poisson(const float* const pat
   }
 }
 
-void cuda_calculate_responsabilities_poisson(const float *const patterns,
-					     const int number_of_patterns,
-					     const float *const slices,
-					     const int number_of_rotations,
-					     const int image_x,
-					     const int image_y,
-					     float *const responsabilities,
-					     const float *const log_factorial_table)
+void calculate_responsabilities_poisson(const float *const patterns,
+					const int number_of_patterns,
+					const float *const slices,
+					const int number_of_rotations,
+					const int image_x,
+					const int image_y,
+					float *const responsabilities,
+					const float *const log_factorial_table)
 {
   dim3 nblocks(number_of_patterns, number_of_rotations);
   int nthreads = NTHREADS;
@@ -145,15 +145,15 @@ __global__ void kernel_calculate_responsabilities_poisson_scaling(const float *c
   }
 }
 
-void cuda_calculate_responsabilities_poisson_scaling(const float *const patterns,
-						     const int number_of_patterns,
-						     const float *const slices,
-						     const int number_of_rotations,
-						     const int image_x,
-						     const int image_y,
-						     const float *const scalings,
-						     float *const responsabilities,
-						     const float *const log_factorial_table)
+void calculate_responsabilities_poisson_scaling(const float *const patterns,
+						const int number_of_patterns,
+						const float *const slices,
+						const int number_of_rotations,
+						const int image_x,
+						const int image_y,
+						const float *const scalings,
+						float *const responsabilities,
+						const float *const log_factorial_table)
 {
   dim3 nblocks(number_of_patterns, number_of_rotations);
   int nthreads = NTHREADS;
@@ -225,17 +225,17 @@ __global__ void kernel_calculate_responsabilities_sparse(const int *const patter
 }
 
 /* Need to calculate slice sums before calling this kernel. But it can be done in python */
-void cuda_calculate_responsabilities_sparse(const int *const pattern_start_indices,
-					    const int *const pattern_indices,
-					    const float *const pattern_values,
-					    const int number_of_patterns,
-					    const float *const slices,
-					    const int number_of_rotations,
-					    const int image_x,
-					    const int image_y,
-					    float *const responsabilities,
-					    float *const slice_sums,
-					    const float *const log_factorial_table)
+void calculate_responsabilities_sparse(const int *const pattern_start_indices,
+				       const int *const pattern_indices,
+				       const float *const pattern_values,
+				       const int number_of_patterns,
+				       const float *const slices,
+				       const int number_of_rotations,
+				       const int image_x,
+				       const int image_y,
+				       float *const responsabilities,
+				       float *const slice_sums,
+				       const float *const log_factorial_table)
 {
   const int nblocks_sum_slices = number_of_rotations;
   const int nthreads_sum_slices = NTHREADS;
@@ -260,10 +260,10 @@ void cuda_calculate_responsabilities_sparse(const int *const pattern_start_indic
 }
 
 __global__ void kernel_calculate_responsabilities_sparse_scaling(const int *const pattern_start_indices,
-const int *const pattern_indices,
+								 const int *const pattern_indices,
 								 const float *const pattern_values,
 								 const float *const slices,
-const int number_of_pixels,
+								 const int number_of_pixels,
 								 const float *const scaling,
 								 float *const responsabilities,
 								 const float *const slice_sums,
@@ -294,18 +294,18 @@ const int number_of_pixels,
 }
 
 /* Need to calculate slice sums before calling this kernel. But it can be done in python */
-void cuda_calculate_responsabilities_sparse_scaling(const int *const pattern_start_indices,
-						    const int *const pattern_indices,
-						    const float *const pattern_values,
-						    const int number_of_patterns,
-						    const float *const slices,
-						    const int number_of_rotations,
-						    const int image_x,
-						    const int image_y,
-						    const float *const scaling,
-						    float *const responsabilities,
-						    float *const slice_sums,
-						    const float *const log_factorial_table)
+void calculate_responsabilities_sparse_scaling(const int *const pattern_start_indices,
+					       const int *const pattern_indices,
+					       const float *const pattern_values,
+					       const int number_of_patterns,
+					       const float *const slices,
+					       const int number_of_rotations,
+					       const int image_x,
+					       const int image_y,
+					       const float *const scaling,
+					       float *const responsabilities,
+					       float *const slice_sums,
+					       const float *const log_factorial_table)
 {
   const int nblocks_sum_slices = number_of_rotations;
   const int nthreads_sum_slices = NTHREADS;

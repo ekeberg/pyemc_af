@@ -214,16 +214,16 @@ __global__ void kernel_expand_model(const float *const model,
 }
 				    
 
-void cuda_expand_model(const float *const model,
-		       const int model_x,
-		       const int model_y,
-		       const int model_z,
-		       float *const slices,
-		       const int image_x,
-		       const int image_y,
-		       const float *const rotations,
-		       const int number_of_rotations,
-		       const float *const coordinates)
+void expand_model(const float *const model,
+		  const int model_x,
+		  const int model_y,
+		  const int model_z,
+		  float *const slices,
+		  const int image_x,
+		  const int image_y,
+		  const float *const rotations,
+		  const int number_of_rotations,
+		  const float *const coordinates)
 {
   int nblocks = number_of_rotations;
   int nthreads = NTHREADS;
@@ -412,19 +412,19 @@ __global__ void kernel_insert_slices(float *const model,
 		      interpolation);
 }
 
-void cuda_insert_slices(float *const model,
-			float *const model_weights,
-			const int model_x,
-			const int model_y,
-			const int model_z,
-			const float *const slices,
-			const int image_x,
-			const int image_y,
-			const float *const slice_weights,
-			const float *const rotations,
-			const int number_of_rotations,
-			const float *const coordinates,
-			const int interpolation)
+void insert_slices(float *const model,
+		   float *const model_weights,
+		   const int model_x,
+		   const int model_y,
+		   const int model_z,
+		   const float *const slices,
+		   const int image_x,
+		   const int image_y,
+		   const float *const slice_weights,
+		   const float *const rotations,
+		   const int number_of_rotations,
+		   const float *const coordinates,
+		   const int interpolation)
 {
   int nblocks = number_of_rotations;
   int nthreads = NTHREADS;
@@ -483,9 +483,9 @@ __device__ void device_insert_slice_partial(float *const model,
   if (blockIdx.x == 0 && threadIdx.x == 0) {
     printf("inside kernel\n");
     /*
-    printf("%i %i %i\n", model_x_tot, model_x_min, model_x_max);
-    printf("%i %i %i\n", model_y_tot, model_y_min, model_y_max);
-    printf("%i %i %i\n", model_z_tot, model_z_min, model_z_max);
+      printf("%i %i %i\n", model_x_tot, model_x_min, model_x_max);
+      printf("%i %i %i\n", model_y_tot, model_y_min, model_y_max);
+      printf("%i %i %i\n", model_z_tot, model_z_min, model_z_max);
     */
     printf("%i %i %i\n", model_x_max-model_x_min, model_y_max-model_y_min, model_z_max-model_z_min);
   }
@@ -580,25 +580,25 @@ __global__ void kernel_insert_slices_partial(float *const model,
 			      interpolation);
 }
 
-void cuda_insert_slices_partial(float *const model,
-				float *const model_weights,
-				const int model_x_tot,
-				const int model_x_min,
-				const int model_x_max,
-				const int model_y_tot,
-				const int model_y_min,
-				const int model_y_max,
-				const int model_z_tot,
-				const int model_z_min,
-				const int model_z_max,
-				const float *const slices,
-				const int image_x,
-				const int image_y,
-				const float *const slice_weights,
-				const float *const rotations,
-				const int number_of_rotations,
-				const float *const coordinates,
-				const int interpolation)
+void insert_slices_partial(float *const model,
+			   float *const model_weights,
+			   const int model_x_tot,
+			   const int model_x_min,
+			   const int model_x_max,
+			   const int model_y_tot,
+			   const int model_y_min,
+			   const int model_y_max,
+			   const int model_z_tot,
+			   const int model_z_min,
+			   const int model_z_max,
+			   const float *const slices,
+			   const int image_x,
+			   const int image_y,
+			   const float *const slice_weights,
+			   const float *const rotations,
+			   const int number_of_rotations,
+			   const float *const coordinates,
+			   const int interpolation)
 {
   int nblocks = number_of_rotations;
   int nthreads = NTHREADS;
@@ -661,9 +661,9 @@ __global__ void kernel_rotate_model(const float *const model,
     float start_z = ((float) (index / (model_x*model_y))) - model_z/2. + 0.5;
 
     /*
-    float start_x = ((float) ((index % (model_x*model_y)) % model_x));
-    float start_y = ((float) ((index / model_x) % model_y));
-    float start_z = ((float) (index / (model_x*model_y)));
+      float start_x = ((float) ((index % (model_x*model_y)) % model_x));
+      float start_y = ((float) ((index / model_x) % model_y));
+      float start_z = ((float) (index / (model_x*model_y)));
     */
     float new_x, new_y, new_z;
     /* This is just a matrix multiplication with rotation */
@@ -682,12 +682,12 @@ __global__ void kernel_rotate_model(const float *const model,
   }
 }
 
-void cuda_rotate_model(const float *const model,
-		       float *const rotated_model,
-		       const int model_x,
-		       const int model_y,
-		       const int model_z,
-		       const float *const rotation)
+void rotate_model(const float *const model,
+		  float *const rotated_model,
+		  const int model_x,
+		  const int model_y,
+		  const int model_z,
+		  const float *const rotation)
 {
   const int nthreads = NTHREADS;
   const int nblocks = (model_x*model_y*model_z-1) / nthreads + 1;

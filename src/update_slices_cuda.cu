@@ -31,13 +31,13 @@ __global__ void kernel_update_slices(float *const slices,
   }
 }
 
-void cuda_update_slices(float *const slices,
-			const int number_of_rotations,
-			const float *const patterns,
-			const int number_of_patterns,
-			const int image_x,
-			const int image_y,
-			const float *const responsabilities)
+void update_slices(float *const slices,
+		   const int number_of_rotations,
+		   const float *const patterns,
+		   const int number_of_patterns,
+		   const int image_x,
+		   const int image_y,
+		   const float *const responsabilities)
 {
   const int nblocks = number_of_rotations;
   const int nthreads = NTHREADS;
@@ -79,14 +79,14 @@ __global__ void kernel_update_slices_scaling(float *const slices,
   }
 }
 
-void cuda_update_slices_scaling(float *const slices,
-				const int number_of_rotations,
-				const float *const patterns,
-				const int number_of_patterns,
-				const int image_x,
-				const int image_y,
-				const float *const responsabilities,
-				const float *const scaling)
+void update_slices_scaling(float *const slices,
+			   const int number_of_rotations,
+			   const float *const patterns,
+			   const int number_of_patterns,
+			   const int image_x,
+			   const int image_y,
+			   const float *const responsabilities,
+			   const float *const scaling)
 {
   const int nblocks = number_of_rotations;
   const int nthreads = NTHREADS;
@@ -116,7 +116,7 @@ __global__ void kernel_update_slices_sparse(float *const slices,
 
   int index_pixel;
 
-  for (int index_pixel = threadIdx.x; index_pixel < number_of_pixels; index_pixel++) {
+  for (int index_pixel = threadIdx.x; index_pixel < number_of_pixels; index_pixel += blockDim.x) {
     slices[index_rotation*number_of_pixels + index_pixel] = 0.;
   }
   __syncthreads();
@@ -140,15 +140,15 @@ __global__ void kernel_update_slices_sparse(float *const slices,
   }
 }
 
-void cuda_update_slices_sparse(float *const slices,
-			       const int number_of_rotations,
-			       const int *const pattern_start_indices,
-			       const int *const pattern_indices,
-			       const float *const pattern_values,
-			       const int number_of_patterns,
-			       const int image_x,
-			       const int image_y,
-			       const float *const responsabilities)
+void update_slices_sparse(float *const slices,
+			  const int number_of_rotations,
+			  const int *const pattern_start_indices,
+			  const int *const pattern_indices,
+			  const float *const pattern_values,
+			  const int number_of_patterns,
+			  const int image_x,
+			  const int image_y,
+			  const float *const responsabilities)
 {
   const int nblocks = number_of_rotations;
   const int nthreads = NTHREADS;
@@ -178,7 +178,7 @@ __global__ void kernel_update_slices_sparse_scaling(float *const slices,
 
   int index_pixel;
 
-  for (int index_pixel = threadIdx.x; index_pixel < number_of_pixels; index_pixel++) {
+  for (int index_pixel = threadIdx.x; index_pixel < number_of_pixels; index_pixel += blockDim.x) {
     slices[index_rotation*number_of_pixels + index_pixel] = 0.;
   }
   __syncthreads();
@@ -202,16 +202,16 @@ __global__ void kernel_update_slices_sparse_scaling(float *const slices,
   }
 }
 
-void cuda_update_slices_sparse_scaling(float *const slices,
-				       const int number_of_rotations,
-				       const int *const pattern_start_indices,
-				       const int *const pattern_indices,
-				       const float *const pattern_values,
-				       const int number_of_patterns,
-				       const int image_x,
-				       const int image_y,
-				       const float *const responsabilities,
-				       const float *const scaling)
+void update_slices_sparse_scaling(float *const slices,
+				  const int number_of_rotations,
+				  const int *const pattern_start_indices,
+				  const int *const pattern_indices,
+				  const float *const pattern_values,
+				  const int number_of_patterns,
+				  const int image_x,
+				  const int image_y,
+				  const float *const responsabilities,
+				  const float *const scaling)
 {
   const int nblocks = number_of_rotations;
   const int nthreads = NTHREADS;

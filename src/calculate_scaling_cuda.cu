@@ -36,12 +36,12 @@ __global__ void kernel_calculate_scaling_poisson(const float *const patterns,
   }
 }
 
-void cuda_calculate_scaling_poisson(const float *const patterns,
-				    const int number_of_patterns,
-				    const float *const slices,
-				    const int number_of_rotations,
-				    const int number_of_pixels,
-				    float *const scaling)
+void calculate_scaling_poisson(const float *const patterns,
+			       const int number_of_patterns,
+			       const float *const slices,
+			       const int number_of_rotations,
+			       const int number_of_pixels,
+			       float *const scaling)
 {
   dim3 nblocks(number_of_patterns, number_of_rotations);
   int nthreads = NTHREADS;
@@ -96,14 +96,14 @@ __global__ void kernel_calculate_scaling_poisson_sparse(const int *const pattern
   }
 }
 
-void cuda_calculate_scaling_poisson_sparse(const int *const pattern_start_indices,
-					   const int *const pattern_indices,
-					   const float *const pattern_values,
-					   const int number_of_patterns,
-					   const float *const slices,
-					   const int number_of_rotations,
-					   const int number_of_pixels,
-					   float *const scaling)
+void calculate_scaling_poisson_sparse(const int *const pattern_start_indices,
+				      const int *const pattern_indices,
+				      const float *const pattern_values,
+				      const int number_of_patterns,
+				      const float *const slices,
+				      const int number_of_rotations,
+				      const int number_of_pixels,
+				      float *const scaling)
 {
   dim3 nblocks(number_of_patterns, number_of_rotations);
   int nthreads = NTHREADS;
