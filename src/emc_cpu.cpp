@@ -395,15 +395,15 @@ void rotate_model(const float *const model,
     */
     float new_x, new_y, new_z;
     /* This is just a matrix multiplication with rotation */
-    new_x = model_x/2. - 0.5 + (rotation_matrix_00*start_z +
+    new_x = model_x/2. - 0.5 + (rotation_matrix_00*start_x +
 				rotation_matrix_01*start_y +
-				rotation_matrix_02*start_x);
-    new_y = model_y/2. - 0.5 + (rotation_matrix_10*start_z +
+				rotation_matrix_02*start_z);
+    new_y = model_y/2. - 0.5 + (rotation_matrix_10*start_x +
 				rotation_matrix_11*start_y +
-				rotation_matrix_12*start_x);
-    new_z = model_z/2. - 0.5 + (rotation_matrix_20*start_z +
+				rotation_matrix_12*start_z);
+    new_z = model_z/2. - 0.5 + (rotation_matrix_20*start_x +
 				rotation_matrix_21*start_y +
-				rotation_matrix_22*start_x);
+				rotation_matrix_22*start_z);
     rotated_model[index] = device_model_get(model,
 					    model_x, model_y, model_z,
 					    new_x, new_y, new_z);

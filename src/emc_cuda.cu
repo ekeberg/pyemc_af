@@ -667,15 +667,15 @@ __global__ void kernel_rotate_model(const float *const model,
     */
     float new_x, new_y, new_z;
     /* This is just a matrix multiplication with rotation */
-    new_x = model_x/2. - 0.5 + (rotation_matrix[0]*start_z +
+    new_x = model_x/2. - 0.5 + (rotation_matrix[0]*start_x +
 				rotation_matrix[1]*start_y +
-				rotation_matrix[2]*start_x);
-    new_y = model_y/2. - 0.5 + (rotation_matrix[3]*start_z +
+				rotation_matrix[2]*start_z);
+    new_y = model_y/2. - 0.5 + (rotation_matrix[3]*start_x +
 				rotation_matrix[4]*start_y +
-				rotation_matrix[5]*start_x);
-    new_z = model_z/2. - 0.5 + (rotation_matrix[6]*start_z +
+				rotation_matrix[5]*start_z);
+    new_z = model_z/2. - 0.5 + (rotation_matrix[6]*start_x +
 				rotation_matrix[7]*start_y +
-				rotation_matrix[8]*start_x);
+				rotation_matrix[8]*start_z);
     rotated_model[index] = device_model_get(model,
 					    model_x, model_y, model_z,
 					    new_x, new_y, new_z);
