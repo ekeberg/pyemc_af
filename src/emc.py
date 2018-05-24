@@ -12,8 +12,10 @@ _INTERPOLATION = {"nearest_neighbour": 0,
 def set_backend(backend):
     if backend == "cuda":
         default_backend[0] = emc_cuda
+        afnumpy.arrayfire.backend.set_unsafe("cuda")
     elif backend == "cpu":
         default_backend[0] = emc_cpu
+        afnumpy.arrayfire.backend.set_unsafe("cpu")
     else:
         raise ValueError("No backend called {}".format(backend))
 
