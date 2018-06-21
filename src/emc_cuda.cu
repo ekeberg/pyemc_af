@@ -286,7 +286,7 @@ __device__ void device_model_set(float *const model,
 	  if (index_z == low_z) weight_z = low_weight_z;
 	  else weight_z = high_weight_z;
 	  
-	  atomicAdd(&model[model_x*model_y*index_x + model_z*index_y + index_z],
+	  atomicAdd(&model[model_z*model_y*index_x + model_z*index_y + index_z],
 		    weight_x*weight_y*weight_z*value_weight*value);
 	  atomicAdd(&model_weights[model_z*model_y*index_x + model_z*index_y + index_z],
 		    weight_x*weight_y*weight_z*value_weight);
