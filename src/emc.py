@@ -159,7 +159,8 @@ def update_slices(slices, patterns, responsabilities, scalings=None,
     if patterns.shape[1:] != slices.shape[1:]: raise ValueError("patterns and images must be the same size 2D images")
     if len(responsabilities.shape) != 2 or slices.shape[0] != responsabilities.shape[0] or patterns.shape[0] != responsabilities.shape[1]:
         raise ValueError("responsabilities must have shape nrotations x npatterns")
-    if scalings is not None and scalings.shape != responsabilities.shape:
+    if scalings is not None and not (scalings.shape == responsabilities.shape or
+                                     (len(scalings.shape) == 1 and scalings.shape[0] == patterns.shape[0])):
         raise ValueError("Scalings must have the same shape as responsabilities")
 
     if scalings is None:
@@ -168,30 +169,23 @@ def update_slices(slices, patterns, responsabilities, scalings=None,
                                  _get_pointer(patterns),
                                  patterns.shape[0], patterns.shape[2], patterns.shape[1],
                                  _get_pointer(responsabilities))
-    else:
+    elif len(scalings.shape) == 2:
+        # Scaling per pattern and slice pair
         backend[0].update_slices_scaling(_get_pointer(slices),
                                          slices.shape[0],
                                          _get_pointer(patterns),
                                          patterns.shape[0], patterns.shape[2], patterns.shape[1],
                                          _get_pointer(responsabilities),
                                          _get_pointer(scalings))
+    else:
+        # Scaling per pattern
+        backend[0].update_slices_per_pattern_scaling(_get_pointer(slices),
+                                                     slices.shape[0],
+                                                     _get_pointer(patterns),
+                                                     patterns.shape[0], patterns.shape[2], patterns.shape[1],
+                                                     _get_pointer(responsabilities),
+                                                     _get_pointer(scalings))
         
-def calculate_responsabilities(patterns, slices, responsabilities, sigma,
-                               backend=default_backend):
-    if len(patterns.shape) != 3: raise ValueError("patterns must be a 3D array")
-    if len(slices.shape) != 3: raise ValueError("slices must be a 3D array")
-    if patterns.shape[1:] != slices.shape[1:]: raise ValueError("patterns and images must be the same size 2D images")
-    if len(responsabilities.shape) != 2 or slices.shape[0] != responsabilities.shape[0] or patterns.shape[0] != responsabilities.shape[1]:
-        raise ValueError("responsabilities must have shape nrotations x npatterns")
-    #sigma = afnumpy.float32(sigma)
-    if sigma <= 0.: raise ValueError("sigma must be larger than zeros")
-    backend[0].calculate_responsabilities(_get_pointer(patterns),
-                                          patterns.shape[0],
-                                          _get_pointer(slices),
-                                          slices.shape[0], slices.shape[2], slices.shape[1],
-                                          _get_pointer(responsabilities),
-                                          sigma)
-
 def _log_factorial_table(max_value):
     if max_value > _MAX_PHOTON_COUNT:
         raise ValueError("Poisson values can not be used with photon counts higher than {0}".format(_MAX_PHOTON_COUNT))
@@ -211,7 +205,8 @@ def calculate_responsabilities_poisson(patterns, slices, responsabilities, scali
     if (calculate_responsabilities_poisson.log_factorial_table is None or
         len(calculate_responsabilities_poisson.log_factorial_table) <= patterns.max()):
         calculate_responsabilities_poisson.log_factorial_table = _log_factorial_table(patterns.max())
-    if scalings is not None and scalings.shape != responsabilities.shape:
+    if scalings is not None and not (scalings.shape == responsabilities.shape or
+                                     (len(scalings.shape) == 1 or scalings.shape[0] == patterns.shape[0])):
         raise ValueError("Scalings must have the same shape as responsabilities")
     if scalings is None:
         backend[0].calculate_responsabilities_poisson(_get_pointer(patterns),
@@ -220,7 +215,8 @@ def calculate_responsabilities_poisson(patterns, slices, responsabilities, scali
                                                       slices.shape[0], slices.shape[2], slices.shape[1],
                                                       _get_pointer(responsabilities),
                                                       _get_pointer(calculate_responsabilities_poisson.log_factorial_table))
-    else:
+    elif len(scalings.shape) == 2:
+        # Scaling per pattern and slice pair
         backend[0].calculate_responsabilities_poisson_scaling(_get_pointer(patterns),
                                                               patterns.shape[0],
                                                               _get_pointer(slices),
@@ -228,6 +224,15 @@ def calculate_responsabilities_poisson(patterns, slices, responsabilities, scali
                                                               _get_pointer(scalings),
                                                               _get_pointer(responsabilities),
                                                               _get_pointer(calculate_responsabilities_poisson.log_factorial_table))
+    else:
+        # Scaling per pattern
+        backend[0].calculate_responsabilities_poisson_per_pattern_scaling(_get_pointer(patterns),
+                                                                          patterns.shape[0],
+                                                                          _get_pointer(slices),
+                                                                          slices.shape[0], slices.shape[2], slices.shape[1],
+                                                                          _get_pointer(scalings),
+                                                                          _get_pointer(responsabilities),
+                                                                          _get_pointer(calculate_responsabilities_poisson.log_factorial_table))
 calculate_responsabilities_poisson.log_factorial_table = None
         
 def calculate_responsabilities_sparse(patterns, slices, responsabilities, scalings=None,
@@ -243,11 +248,13 @@ def calculate_responsabilities_sparse(patterns, slices, responsabilities, scalin
         raise ValueError("start_indices must be a 1d array of length one more than the number of patterns")
     if len(patterns["indices"].shape) != 1 or len(patterns["values"].shape) != 1 or patterns["indices"].shape != patterns["values"].shape:
         raise ValueError("indices and values must have the same shape")
+    number_of_patterns = len(patterns["start_indices"])-1
     if len(slices.shape) != 3:
         raise ValueError("slices must be a 3d array")
     if slices.shape[0] != responsabilities.shape[0]:
         raise ValueError("Responsabilities and slices indicate different number of orientations")
-    if scalings is not None and scalings.shape != responsabilities.shape:
+    if scalings is not None and not (scalings.shape == responsabilities.shape or
+                                     (len(scalings.shape) == 1 or scalings.shape[0] == number_of_patterns)):
         raise ValueError("Scalings must have the same shape as responsabilities")
     
     if (calculate_responsabilities_sparse.log_factorial_table is None or
@@ -258,7 +265,6 @@ def calculate_responsabilities_sparse(patterns, slices, responsabilities, scalin
         len(calculate_responsabilities_sparse.slice_sums) != len(slices)):
         calculate_responsabilities_sparse.slice_sums = afnumpy.empty(len(slices), dtype=afnumpy.float32)
 
-    number_of_patterns = len(patterns["start_indices"])-1
     number_of_rotations = len(slices)
     if scalings is None:
         backend[0].calculate_responsabilities_sparse(_get_pointer(patterns["start_indices"]),
@@ -271,7 +277,8 @@ def calculate_responsabilities_sparse(patterns, slices, responsabilities, scalin
                                                      _get_pointer(responsabilities),
                                                      _get_pointer(calculate_responsabilities_sparse.slice_sums),
                                                      _get_pointer(calculate_responsabilities_sparse.log_factorial_table))
-    else:
+    elif len(scalings.shape) == 2:
+        # Scaling per pattern and slice pair
         backend[0].calculate_responsabilities_sparse_scaling(_get_pointer(patterns["start_indices"]),
                                                              _get_pointer(patterns["indices"]),
                                                              _get_pointer(patterns["values"]),
@@ -283,9 +290,22 @@ def calculate_responsabilities_sparse(patterns, slices, responsabilities, scalin
                                                              _get_pointer(responsabilities),
                                                              _get_pointer(calculate_responsabilities_sparse.slice_sums),
                                                              _get_pointer(calculate_responsabilities_sparse.log_factorial_table))
-
+    else:
+        # Scaling per pattern
+        backend[0].calculate_responsabilities_sparse_per_pattern_scaling(_get_pointer(patterns["start_indices"]),
+                                                                         _get_pointer(patterns["indices"]),
+                                                                         _get_pointer(patterns["values"]),
+                                                                         number_of_patterns,
+                                                                         _get_pointer(slices),
+                                                                         number_of_rotations,
+                                                                         slices.shape[2], slices.shape[1],
+                                                                         _get_pointer(scalings),
+                                                                         _get_pointer(responsabilities),
+                                                                         _get_pointer(calculate_responsabilities_sparse.slice_sums),
+                                                                         _get_pointer(calculate_responsabilities_sparse.log_factorial_table))
 calculate_responsabilities_sparse.log_factorial_table = None
 calculate_responsabilities_sparse.slice_sums = None
+
 def update_slices_sparse(slices, patterns, responsabilities, scalings=None,
                          backend=default_backend):
     if (not "indices" in patterns or
@@ -297,13 +317,14 @@ def update_slices_sparse(slices, patterns, responsabilities, scalings=None,
         raise ValueError("start_indices must be a 1d array of length one more than the number of patterns")
     if len(patterns["indices"].shape) != 1 or len(patterns["values"].shape) != 1 or patterns["indices"].shape != patterns["values"].shape:
         raise ValueError("indices and values must have the same shape")
+    number_of_patterns = len(patterns["start_indices"])-1
     if len(slices.shape) != 3:
         raise ValueError("slices must be a 3d array")
     if slices.shape[0] != responsabilities.shape[0]:
         raise ValueError("Responsabilities and slices indicate different number of orientations")
-    if scalings is not None and scalings.shape != responsabilities.shape:
+    if scalings is not None and not (scalings.shape == responsabilities.shape or
+                                     (len(scalings.shape) == 1 and scalings.shape[0] == number_of_patterns)):
         raise ValueError("Scalings must have the same shape as responsabilities")
-    number_of_patterns = len(patterns["start_indices"])-1
     number_of_rotations = len(slices)
     if scalings is None:
         backend[0].update_slices_sparse(_get_pointer(slices),
@@ -315,7 +336,8 @@ def update_slices_sparse(slices, patterns, responsabilities, scalings=None,
                                         slices.shape[2],
                                         slices.shape[1],
                                         _get_pointer(responsabilities))
-    else:
+    elif len(scalings.shape) == 2:
+        # Scaling per pattern and slice pair
         backend[0].update_slices_sparse_scaling(_get_pointer(slices),
                                                 number_of_rotations,
                                                 _get_pointer(patterns["start_indices"]),
@@ -326,6 +348,18 @@ def update_slices_sparse(slices, patterns, responsabilities, scalings=None,
                                                 slices.shape[1],
                                                 _get_pointer(responsabilities),
                                                 _get_pointer(scalings))
+    else:
+        # Scaling per pattern
+        backend[0].update_slices_sparse_per_pattern_scaling(_get_pointer(slices),
+                                                            number_of_rotations,
+                                                            _get_pointer(patterns["start_indices"]),
+                                                            _get_pointer(patterns["indices"]),
+                                                            _get_pointer(patterns["values"]),
+                                                            number_of_patterns,
+                                                            slices.shape[2],
+                                                            slices.shape[1],
+                                                            _get_pointer(responsabilities),
+                                                            _get_pointer(scalings))
 
 def calculate_scaling_poisson(patterns, slices, scaling, backend=default_backend):
     if len(patterns.shape) != 3:
@@ -344,6 +378,29 @@ def calculate_scaling_poisson(patterns, slices, scaling, backend=default_backend
                                          slices.shape[0],
                                          afnumpy.prod(slices.shape[1:]),
                                          _get_pointer(scaling))
+
+def calculate_scaling_per_pattern_poisson(patterns, slices, responsabilities, scaling, backend=default_backend):
+    if len(patterns.shape) != 3:
+        raise ValueError("Patterns must be a 3D array")
+    if len(slices.shape) != 3:
+        raise ValueError("Slices must be a 3D array")
+    if len(scaling.shape) != 1:
+        raise ValueError("Slices must be a 1D array")
+    if len(responsabilities.shape) != 2:
+        raise ValueError("Slices must be a 2D array")
+    if slices.shape[1:] != patterns.shape[1:]:
+        raise ValueError("Slices and patterns must be the same shape")
+    if scaling.shape[0] != patterns.shape[0]:
+        raise ValueError("scaling must have same length as patterns")
+    if slices.shape[0] != responsabilities.shape[0] or patterns.shape[0] != responsabilities.shape[1]:
+        raise ValueError("Responsabilities must have shape nrotations x npatterns")
+    backend[0].calculate_scaling_per_pattern_poisson(_get_pointer(patterns),
+                                                     patterns.shape[0],
+                                                     _get_pointer(slices),
+                                                     slices.shape[0],
+                                                     afnumpy.prod(slices.shape[1:]),
+                                                     _get_pointer(responsabilities),
+                                                     _get_pointer(scaling))
 
 def calculate_scaling_poisson_sparse(patterns, slices, scaling, backend=default_backend):
     if not isinstance(patterns, dict):
@@ -372,8 +429,40 @@ def calculate_scaling_poisson_sparse(patterns, slices, scaling, backend=default_
                                                 afnumpy.prod(slices.shape[1:]),
                                                 _get_pointer(scaling))
 
+def calculate_scaling_per_pattern_poisson_sparse(patterns, slices, scaling, backend=default_backend):
+    if not isinstance(patterns, dict):
+        raise ValueError("patterns must be a dictionary containing the keys: indcies, values and start_indices")
+    if ("indices" not in patterns or
+        "values" not in patterns or
+        "start_indices" not in patterns):
+        raise ValueError("patterns must contain the keys indcies, values and start_indices")
+    if len(patterns["start_indices"].shape) != 1 or patterns["start_indices"].shape[0] != scaling.shape[1]+1:
+        raise ValueError("start_indices must be a 1d array of length one more than the number of patterns")
+    if len(patterns["indices"].shape) != 1 or len(patterns["values"].shape) != 1 or patterns["indices"].shape != patterns["values"].shape:
+        raise ValueError("indices and values must have the same shape")
+    if len(slices.shape) != 3:
+        raise ValueError("Slices must be a 3D array")
+    if len(scaling.shape) != 1:
+        raise ValueError("Slices must be a 1D array")
+    number_of_patterns = len(patterns["start_indices"])-1
+    if scaling.shape[0] != number_of_patterns:
+        raise ValueError("scaling must have same length as patterns")
+    if slices.shape[0] != responsabilities.shape[0] or number_of_patterns != responsabilities.shape[1]:
+        raise ValueError("Responsabilities must have shape nrotations x npatterns")
+    backend[0].calculate_scaling_poisson_sparse(_get_pointer(patterns["start_indices"]),
+                                                _get_pointer(patterns["indices"]),
+                                                _get_pointer(patterns["values"]),
+                                                number_of_patterns,
+                                                _get_pointer(slices),
+                                                slices.shape[0],
+                                                afnumpy.prod(slices.shape[1:]),
+                                                _get_pointer(responsabilities),
+                                                _get_pointer(scaling))
+
 # Attempt to fix for high angles
-def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
+def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size, edge_distance=None):
+    if edge_distance is None:
+        edge_distance = image_shape[0]/2.
     x_pixels_1d = afnumpy.arange(image_shape[1]) - image_shape[1]/2. + 0.5
     y_pixels_1d = afnumpy.arange(image_shape[0]) - image_shape[0]/2. + 0.5
     y_pixels, x_pixels = numpy.meshgrid(y_pixels_1d, x_pixels_1d, indexing="ij")
@@ -388,6 +477,9 @@ def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
     x = x_meters * radius_fourier / radius_meters
     y = y_meters * radius_fourier / radius_meters
 
+    x[radius_meters == 0.] = 0.
+    y[radius_meters == 0.] = 0.
+
     output_coordinates = afnumpy.zeros((3, ) + image_shape, dtype=afnumpy.float32)
     output_coordinates[0, :, :] = afnumpy.float32(x)
     output_coordinates[1, :, :] = afnumpy.float32(y)
@@ -395,7 +487,7 @@ def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
 
     # Rescale so that edge pixels match.
     furthest_edge_coordinate = afnumpy.sqrt(x[0, image_shape[1]/2]**2 + y[0, image_shape[1]/2]**2 + z[0, image_shape[1]/2]**2)
-    rescale_factor = image_shape[0]/2./furthest_edge_coordinate
+    rescale_factor = edge_distance/furthest_edge_coordinate
     output_coordinates *= rescale_factor
     
     return output_coordinates
