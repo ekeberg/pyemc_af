@@ -106,8 +106,8 @@ float device_model_get(const float *const model,
 	  if (index_z == low_z) weight_z = low_weight_z;
 	  else weight_z = high_weight_z;
 
-	  if (model[model_x*model_y*index_z + model_x*index_y + index_x] >= 0.) {
-	    interp_sum += weight_x*weight_y*weight_z*model[model_x*model_y*index_z + model_x*index_y + index_x];
+	  if (model[model_z*model_y*index_x + model_z*index_y + index_z] >= 0.) {
+	    interp_sum += weight_x*weight_y*weight_z*model[model_z*model_y*index_x + model_z*index_y + index_z];
 	    interp_weight += weight_x*weight_y*weight_z;
 	  }
 	}
@@ -152,20 +152,20 @@ void device_get_slice(const float *const model,
   for (int x = 0; x < image_x; x++) {
     for (int y = 0; y < image_y; y++) {
       /* This is just a matrix multiplication with rotation */
-      new_x = (m00*coordinates_0[y*image_x+x] +
-	       m01*coordinates_1[y*image_x+x] +
-	       m02*coordinates_2[y*image_x+x] +
+      new_x = (m00*coordinates_0[x*image_y+y] +
+	       m01*coordinates_1[x*image_y+y] +
+	       m02*coordinates_2[x*image_y+y] +
 	       model_x/2.0 - 0.5);
-      new_y = (m10*coordinates_0[y*image_x+x] +
-	       m11*coordinates_1[y*image_x+x] +
-	       m12*coordinates_2[y*image_x+x] +
+      new_y = (m10*coordinates_0[x*image_y+y] +
+	       m11*coordinates_1[x*image_y+y] +
+	       m12*coordinates_2[x*image_y+y] +
 	       model_y/2.0 - 0.5);
-      new_z = (m20*coordinates_0[y*image_x+x] +
-	       m21*coordinates_1[y*image_x+x] +
-	       m22*coordinates_2[y*image_x+x] +
+      new_z = (m20*coordinates_0[x*image_y+y] +
+	       m21*coordinates_1[x*image_y+y] +
+	       m22*coordinates_2[x*image_y+y] +
 	       model_z/2.0 - 0.5);
 
-      slice[y*image_x+x] = device_model_get(model, model_x, model_y, model_z, new_x, new_y, new_z);
+      slice[x*image_y+y] = device_model_get(model, model_x, model_y, model_z, new_x, new_y, new_z);
     }
   }
 }
@@ -241,8 +241,8 @@ void device_model_set(float *const model,
 	  if (index_z == low_z) weight_z = low_weight_z;
 	  else weight_z = high_weight_z;
 
-	  model[model_x*model_y*index_z + model_x*index_y + index_x] += weight_x*weight_y*weight_z*value_weight*value;
-	  model_weights[model_x*model_y*index_z + model_x*index_y + index_x] += weight_x*weight_y*weight_z*value_weight;
+	  model[model_x*model_z*index_x + model_z*index_y + index_z] += weight_x*weight_y*weight_z*value_weight*value;
+	  model_weights[model_z*model_y*index_x + model_z*index_y + index_z] += weight_x*weight_y*weight_z*value_weight;
 	}
       }
     }
@@ -266,8 +266,8 @@ void device_model_set_nn(float *const model,
   if (index_x >= 0 && index_x < model_x &&
       index_y >= 0 && index_y < model_y &&
       index_z >= 0 && index_z < model_z) {
-    model[model_x*model_y*index_z + model_x*index_y + index_x] += value_weight*value;
-    model_weights[model_x*model_y*index_z + model_x*index_y + index_x] += value_weight;
+    model[model_z*model_y*index_x + model_z*index_y + index_z] += value_weight*value;
+    model_weights[model_z*model_y*index_x + model_z*index_y + index_z] += value_weight;
   }
 }
 
@@ -304,31 +304,31 @@ void device_insert_slice(float *const model,
   float new_x, new_y, new_z;
   for (int x = 0; x < image_x; x++) {
     for (int y = 0; y < image_y; y++) {
-      if (slice[y*image_x+x] >= 0.) {
+      if (slice[x*image_y+y] >= 0.) {
 	/* This is just a matrix multiplication with rotation */
-	new_x = (m00*coordinates_0[y*image_x+x] +
-		 m01*coordinates_1[y*image_x+x] +
-		 m02*coordinates_2[y*image_x+x] +
+	new_x = (m00*coordinates_0[x*image_y+y] +
+		 m01*coordinates_1[x*image_y+y] +
+		 m02*coordinates_2[x*image_y+y] +
 		 model_x/2.0 - 0.5);
-	new_y = (m10*coordinates_0[y*image_x+x] +
-		 m11*coordinates_1[y*image_x+x] +
-		 m12*coordinates_2[y*image_x+x] +
+	new_y = (m10*coordinates_0[x*image_y+y] +
+		 m11*coordinates_1[x*image_y+y] +
+		 m12*coordinates_2[x*image_y+y] +
 		 model_y/2.0 - 0.5);
-	new_z = (m20*coordinates_0[y*image_x+x] +
-		 m21*coordinates_1[y*image_x+x] +
-		 m22*coordinates_2[y*image_x+x] +
+	new_z = (m20*coordinates_0[x*image_y+y] +
+		 m21*coordinates_1[x*image_y+y] +
+		 m22*coordinates_2[x*image_y+y] +
 		 model_z/2.0 - 0.5);
 
 	if (interpolation == 0) {
 	  device_model_set_nn(model, model_weights,
 			      model_x, model_y, model_z,
 			      new_x, new_y, new_z,
-			      slice[y*image_x+x], slice_weight);
+			      slice[x*image_y+y], slice_weight);
 	} else {
 	  device_model_set(model, model_weights,
 			   model_x, model_y, model_z,
 			   new_x, new_y, new_z,
-			   slice[y*image_x+x], slice_weight);
+			   slice[x*image_y+y], slice_weight);
 	}
       }
     }
@@ -384,9 +384,9 @@ void rotate_model(const float *const model,
     float rotation_matrix_21 = 2.0f*rotation[2]*rotation[3] + 2.0f*rotation[0]*rotation[1]; // 21
     float rotation_matrix_22 = rotation[0]*rotation[0] - rotation[1]*rotation[1] - rotation[2]*rotation[2] + rotation[3]*rotation[3]; // 22
 
-    float start_x = ((float) ((index % (model_x*model_y)) % model_x)) - model_x/2. + 0.5;
+    float start_z = ((float) ((index % (model_x*model_y)) % model_x)) - model_x/2. + 0.5;
     float start_y = ((float) ((index / model_x) % model_y)) - model_y/2. + 0.5;
-    float start_z = ((float) (index / (model_x*model_y))) - model_z/2. + 0.5;
+    float start_x = ((float) (index / (model_x*model_y))) - model_z/2. + 0.5;
 
     /*
       float start_x = ((float) ((index % (model_x*model_y)) % model_x));
