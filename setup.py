@@ -26,14 +26,14 @@ def locate_cuda():
                   "nvcc": nvcc,
                   "include": os.path.join(home, "include"),
                   "lib64": os.path.join(home, "lib64")}
-    print cudaconfig
-    for k, v in cudaconfig.iteritems():
+    print(cudaconfig)
+    for k, v in cudaconfig.items():
         if not os.path.exists(v):
             raise EnvironmentError("The CUDA {0} path could not be located in {1}".format(k, v))
     return cudaconfig
 
 CUDA = locate_cuda()
-print CUDA
+print(CUDA)
 try:
     numpy_include = numpy.get_include()
 except AttributeError:
