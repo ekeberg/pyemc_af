@@ -23,9 +23,12 @@ __global__ void kernel_calculate_responsabilities_poisson(const float* const pat
   float sum = 0.;
   for (int index = threadIdx.x; index < number_of_pixels; index += blockDim.x) {
     if (pattern[index] >= 0. && slice[index] > 0.) {
+      /* sum += ((-slice[index]) + */
+      /* 	      ((int) pattern[index]) * logf(slice[index]) - */
+      /* 	      log_factorial_table[(int) pattern[index]]); */
       sum += ((-slice[index]) +
-	      ((int) pattern[index]) * logf(slice[index]) -
-	      log_factorial_table[(int) pattern[index]]);
+      	      ((int) pattern[index]) * logf(slice[index]) -
+      	      log_factorial_table[(int) pattern[index]]);
     }
   }
   sum_cache[threadIdx.x] = sum;
@@ -214,8 +217,8 @@ __global__ void kernel_calculate_responsabilities_sparse(const int *const patter
     index_pixel = pattern_indices[index];
     if (slice[index_pixel] > 0.) {
       sum += (((int) pattern_values[index]) *
-	      logf(slice[index_pixel]) -
-	      log_factorial_table[(int)pattern_values[index]]);
+      	      logf(slice[index_pixel]) -
+      	      log_factorial_table[(int)pattern_values[index]]);
     }
   }
   sum_cache[threadIdx.x] = sum;
@@ -241,8 +244,8 @@ void calculate_responsabilities_sparse(const int *const pattern_start_indices,
   const int nblocks_sum_slices = number_of_rotations;
   const int nthreads_sum_slices = NTHREADS;
   kernel_sum_slices<<<nblocks_sum_slices, nthreads_sum_slices>>>(slices,
-								 image_x*image_y,
-								 slice_sums);
+  								 image_x*image_y,
+  								 slice_sums);
   cudaErrorCheck(cudaPeekAtLastError());
   cudaErrorCheck(cudaDeviceSynchronize());
   
@@ -281,7 +284,11 @@ __global__ void kernel_calculate_responsabilities_sparse_scaling(const int *cons
   
   int index_pixel;
   float sum = 0.;
-  for (int index = pattern_start_indices[index_pattern]+threadIdx.x; index < pattern_start_indices[index_pattern+1]; index += blockDim.x) {
+  int this_pattern_start = pattern_start_indices[index_pattern];
+  int this_pattern_end = pattern_start_indices[index_pattern+1];
+  for (int index = this_pattern_start+threadIdx.x;
+       index < this_pattern_end;
+       index += blockDim.x) {
     index_pixel = pattern_indices[index];
     if (slice[index_pixel] > 0.) {
       sum += ((int) pattern_values[index]) * logf(slice[index_pixel]/this_scaling) - log_factorial_table[(int)pattern_values[index]];

@@ -90,7 +90,8 @@ void update_slices_sparse(float *const slices,
 			  const int number_of_patterns,
 			  const int image_x,
 			  const int image_y,
-			  const float *const responsabilities);
+			  const float *const responsabilities,
+			  const float resp_threshold);
 
 void update_slices_sparse_scaling(float *const slices,
 				  const int number_of_rotations,
@@ -101,6 +102,7 @@ void update_slices_sparse_scaling(float *const slices,
 				  const int image_x,
 				  const int image_y,
 				  const float *const responsabilities,
+				  const float resp_threshold,
 				  const float *const scaling);
 
 void update_slices_sparse_per_pattern_scaling(float *const slices,
