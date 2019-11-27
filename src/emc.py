@@ -337,7 +337,8 @@ def update_slices_sparse(slices, patterns, responsabilities, scalings=None, resp
                                         slices.shape[1],
                                         _get_pointer(responsabilities),
                                         resp_threshold)
-    else:
+    elif len(scalings.shape) == 2:
+        # Scaling per pattern and slice pair
         backend[0].update_slices_sparse_scaling(_get_pointer(slices),
                                                 number_of_rotations,
                                                 _get_pointer(patterns["start_indices"]),
