@@ -3,7 +3,8 @@ import emc_cpu
 import afnumpy
 import numpy
 
-default_backend = [emc_cpu]
+default_backend = [emc_cuda]
+afnumpy.arrayfire.backend.set_unsafe("cuda")
 
 _MAX_PHOTON_COUNT = 1500
 _INTERPOLATION = {"nearest_neighbour": 0,
@@ -286,7 +287,7 @@ def calculate_responsabilities_sparse(patterns, slices, responsabilities, scalin
 
 calculate_responsabilities_sparse.log_factorial_table = None
 calculate_responsabilities_sparse.slice_sums = None
-def update_slices_sparse(slices, patterns, responsabilities, scalings=None,
+def update_slices_sparse(slices, patterns, responsabilities, scalings=None, resp_threshold=0.,
                          backend=default_backend):
     if (not "indices" in patterns or
         not "values" in patterns or
@@ -314,7 +315,8 @@ def update_slices_sparse(slices, patterns, responsabilities, scalings=None,
                                         number_of_patterns,
                                         slices.shape[2],
                                         slices.shape[1],
-                                        _get_pointer(responsabilities))
+                                        _get_pointer(responsabilities),
+                                        resp_threshold)
     else:
         backend[0].update_slices_sparse_scaling(_get_pointer(slices),
                                                 number_of_rotations,
@@ -325,6 +327,7 @@ def update_slices_sparse(slices, patterns, responsabilities, scalings=None,
                                                 slices.shape[2],
                                                 slices.shape[1],
                                                 _get_pointer(responsabilities),
+                                                resp_threshold,
                                                 _get_pointer(scalings))
 
 def calculate_scaling_poisson(patterns, slices, scaling, backend=default_backend):
@@ -432,3 +435,56 @@ def rotate_model(model, rotated_model, rotation, backend=default_backend):
                             _get_pointer(rotation))
     
 
+def chunks(number_of_rotations, chunk_size):
+    """Generator for slices to chunk up the data"""
+    chunk_starts = afnumpy.arange(0, number_of_rotations, chunk_size)
+    chunk_ends = chunk_starts + chunk_size
+    chunk_ends[-1] = number_of_rotations
+    chunk_sizes = chunk_ends - chunk_starts
+    indices_cpu = [slice(this_chunk_start, this_chunk_end) for this_chunk_start, this_chunk_end
+                    in zip(chunk_starts, chunk_ends)]
+    indices_gpu = [slice(None, this_chunk_end-this_chunk_start) for this_chunk_start, this_chunk_end
+                     in zip(chunk_starts, chunk_ends)]
+    for this_indices_cpu, this_indices_gpu in zip(indices_cpu, indices_gpu):
+        yield this_indices_cpu, this_indices_gpu
+
+def radial_average(image, mask=None):
+    """Calculates the radial average of an array of any shape,
+    the center is assumed to be at the physical center."""
+    if mask is None:
+        mask = numpy.ones(image.shape, dtype='bool8')
+    else:
+        mask = numpy.bool8(mask)
+    axis_values = [numpy.arange(l) - l/2. + 0.5 for l in image.shape]
+    radius = numpy.zeros((image.shape[-1]))
+    for i in range(len(image.shape)):
+        radius = radius + (axis_values[-(1+i)][(slice(0, None), ) + (numpy.newaxis, )*i])**2
+    radius = numpy.int32(numpy.sqrt(radius))
+    number_of_bins = radius[mask].max() + 1
+    radial_sum = numpy.zeros(number_of_bins)
+    weight = numpy.zeros(number_of_bins)
+    for value, this_radius in zip(image[mask], radius[mask]):
+        radial_sum[this_radius] += value
+        weight[this_radius] += 1.
+    radial_sum[weight > 0] /= weight[weight > 0]
+    radial_sum[weight == 0] = numpy.nan
+    return radial_sum
+        
+def init_model_radial_average(patterns, randomness=0.):
+    """Simple function to create a random start. The new array will have
+    a side similar to the second axis of the patterns"""
+    pattern_mean = patterns.mean(axis=0)
+    pattern_radial_average = radial_average(numpy.array(patterns.mean(axis=0)))
+    side = patterns.shape[1]
+    x = numpy.arange(side) - side/2 + 0.5
+
+    r_int = numpy.int32(numpy.sqrt(x[:, numpy.newaxis, numpy.newaxis]**2 +
+                                   x[numpy.newaxis, :, numpy.newaxis]**2 +
+                                   x[numpy.newaxis, numpy.newaxis, :]**2))
+    r_int_copy = r_int.copy()
+    r_int[r_int >= len(pattern_radial_average)] = 0
+    
+    model = pattern_radial_average[numpy.int32(r_int)]
+    model *= 1. - randomness + 2. * randomness * numpy.random.random((side, )*3)
+    model[r_int_copy >= len(pattern_radial_average)] = -1.    
+    return afnumpy.array(model, dtype=numpy.dtype("float32"))

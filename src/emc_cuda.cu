@@ -60,6 +60,14 @@ int *int_to_int_pointer(const unsigned long long pointer_int)
   return pointer;
 }
 
+__device__ void quaternion_multiply(float *const res, const float *const quat1, const float *const quat2)
+{
+  res[0] = quat1[0]*quat2[0] - quat1[1]*quat2[1] - quat1[2]*quat2[2] - quat1[3]*quat2[3];
+  res[1] = quat1[0]*quat2[1] + quat1[1]*quat2[0] + quat1[2]*quat2[3] - quat1[3]*quat2[2];
+  res[2] = quat1[0]*quat2[2] - quat1[1]*quat2[3] + quat1[2]*quat2[0] + quat1[3]*quat2[1];
+  res[3] = quat1[0]*quat2[3] + quat1[1]*quat2[2] - quat1[2]*quat2[1] + quat1[3]*quat2[0];
+}
+
 __device__ void device_interpolate_get_coordinate_weight(const float coordinate,
 							 const int side,
 							 int *low_coordinate,
