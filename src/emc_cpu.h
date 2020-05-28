@@ -150,3 +150,23 @@ void rotate_model(const float *const model,
 		  const int model_z,
 		  const float *const rotation);
 
+void expand_model_2d(const float *const model,
+		     const int model_x,
+		     const int model_y,
+		     float *const slices,
+		     const int image_x,
+		     const int image_y,
+		     const float *const rotations,
+		     const int number_of_rotations);
+
+void insert_slices_2d(float *const model,
+		      float *const model_weights,
+		      const int model_x,
+		      const int model_y,
+		      const float *const slices,
+		      const int image_x,
+		      const int image_y,
+		      const float *const slice_weights,
+		      const float *const rotations,
+		      const int number_of_rotations,
+		      const int interpolation);

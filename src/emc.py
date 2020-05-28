@@ -1,9 +1,18 @@
-import emc_cuda
-import emc_cpu
+try:
+    import emc_cuda
+except ImportError:
+    emc_cuda = None
+try:
+    import emc_cpu
+except ImportError:
+    emc_cpu = None
 import afnumpy
 import numpy
 
-default_backend = [emc_cpu]
+if emc_cuda is None and emc_cpu is None:
+    raise ImportError("Could not load any emc backend (cuda or cpu)")
+    
+default_backend = [emc_cuda if emc_cuda else emc_cpu]
 
 _MAX_PHOTON_COUNT = 1500
 _INTERPOLATION = {"nearest_neighbour": 0,
@@ -11,9 +20,13 @@ _INTERPOLATION = {"nearest_neighbour": 0,
 
 def set_backend(backend):
     if backend == "cuda":
+        if emc_cuda is None:
+            raise ImportError("CUDA backend is not available")
         default_backend[0] = emc_cuda
         afnumpy.arrayfire.backend.set_unsafe("cuda")
     elif backend == "cpu":
+        if emc_cpu is None:
+            raise ImportError("CPU backend is not available")
         default_backend[0] = emc_cpu
         afnumpy.arrayfire.backend.set_unsafe("cpu")
     else:
@@ -400,25 +413,20 @@ def ewald_coordinates(image_shape, wavelength, detector_distance, pixel_size):
     
     return output_coordinates
 
-# Old standard
-def ewald_coordinates_old(image_shape, wavelength, detector_distance, pixel_size):
-    pixels_to_im = pixel_size/detector_distance/wavelength
-    x_pixels = afnumpy.arange(image_shape[0], dtype="float32") - image_shape[1]/2 + 0.5
-    y_pixels = afnumpy.arange(image_shape[1], dtype="float32") - image_shape[0]/2 + 0.5
-    x = x_pixels*pixels_to_im
-    y = y_pixels*pixels_to_im
-    r_pixels = afnumpy.sqrt(x_pixels[afnumpy.newaxis, :]**2 + y_pixels[:, afnumpy.newaxis]**2)
-    theta = afnumpy.arctan(r_pixels*pixel_size / detector_distance)
-    z = -1./wavelength*(1 - afnumpy.cos(theta))
-    z_pixels = z/pixels_to_im
+def ewald_solid_angles(image_shape, detector_distance, pixel_size):
+    x_pixels_1d = afnumpy.arange(image_shape[1]) - image_shape[1]/2. + 0.5
+    y_pixels_1d = afnumpy.arange(image_shape[0]) - image_shape[0]/2. + 0.5
+    y_pixels, x_pixels = numpy.meshgrid(y_pixels_1d, x_pixels_1d, indexing="ij")
+    x_meters = afnumpy.array(x_pixels*pixel_size, dtype=afnumpy.float32)
+    y_meters = afnumpy.array(y_pixels*pixel_size, dtype=afnumpy.float32)
 
-    y_2d, x_2d = afnumpy.meshgrid(y_pixels, x_pixels, indexing="ij")
-    #x_2d, y_2d = afnumpy.meshgrid(x_pixels, y_pixels, indexing="ij")
-    output_coordinates = afnumpy.zeros((3, ) + image_shape, dtype="float32")
-    output_coordinates[0, :, :] = x_2d
-    output_coordinates[1, :, :] = y_2d
-    output_coordinates[2, :, :] = z_pixels
-    return output_coordinates
+    distance_meters = afnumpy.sqrt(x_meters**2 + y_meters**2 + detector_distance**2)
+
+    radius_meters = afnumpy.sqrt(x_meters**2 + y_meters**2)
+    scattering_angle = afnumpy.arctan(radius_meters / detector_distance)
+
+    solid_angle = pixel_size**2/distance_meters**2*afnumpy.cos(scattering_angle)
+    return solid_angle
 
 def rotate_model(model, rotated_model, rotation, backend=default_backend):
     rotation = afnumpy.array(rotation, dtype="float32")
@@ -432,3 +440,48 @@ def rotate_model(model, rotated_model, rotation, backend=default_backend):
                             _get_pointer(rotation))
     
 
+def expand_model_2d(model, slices, rotations, backend=default_backend):
+    if len(slices) != len(rotations):
+        raise ValueError("Slices and rotations must be of the same length.")
+    if len(model.shape) != 2:
+        raise ValueError("Model must be a 2D array.")
+    if len(slices.shape) != 3:
+        raise ValueError("Slices must be a 3D array.")
+    if len(rotations.shape) != 1:
+        raise ValueError("rotations must be a 1D array.")
+
+    number_of_rotations = len(rotations)
+    backend[0].expand_model_2d(_get_pointer(model),
+                            model.shape[1], model.shape[0],
+                            _get_pointer(slices),
+                            slices.shape[2], slices.shape[1],
+                            _get_pointer(rotations),
+                            number_of_rotations)
+
+    
+def insert_slices_2d(model, model_weights, slices, slice_weights, rotations, interpolation="linear",
+                  backend=default_backend):
+    if len(slices) != len(rotations):
+        raise ValueError("slices and rotations must be of the same length.")
+    if len(slices) != len(slice_weights):
+        raise ValueError("slices and slice_weights must be of the same length.")
+    if len(slice_weights.shape) != 1:
+        raise ValueError("slice_weights must be one dimensional.")
+    if len(model.shape) != 2 or model.shape != model_weights.shape:
+        raise ValueError("model and model_weights must be 2D arrays of the same shape")
+    if len(slices.shape) != 3:
+        raise ValueError("Slices must be a 3D array.")
+    if len(rotations.shape) != 1:
+        raise ValueError("Rotations must be a 1D array.")
+
+    interpolation_int = _INTERPOLATION[interpolation]
+    number_of_rotations = len(rotations)
+    backend[0].insert_slices_2d(_get_pointer(model),
+                                _get_pointer(model_weights),
+                                model.shape[1], model.shape[0],
+                                _get_pointer(slices),
+                                slices.shape[2], slices.shape[1],
+                                _get_pointer(slice_weights),
+                                _get_pointer(rotations),
+                                number_of_rotations,
+                                interpolation_int)
