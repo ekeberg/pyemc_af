@@ -2,6 +2,7 @@
 #define CUDA_TOOLS_H
 
 const int NTHREADS = 256;
+//const int NTHREADS = 128;
 const float RESPONSABILITY_THRESHOLD = 1e-10f;
 
 #define cudaErrorCheck(ans) {_cudaErrorCheck((ans), __FILE__, __LINE__);}

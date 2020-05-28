@@ -25,7 +25,7 @@ def locate_cuda():
     cudaconfig = {"home": home,
                   "nvcc": nvcc,
                   "include": os.path.join(home, "include"),
-                  "lib": os.path.join(home, "lib")}
+                  "lib": os.path.join(home, "lib64")}
     print(cudaconfig)
     for k, v in cudaconfig.items():
         if not os.path.exists(v):

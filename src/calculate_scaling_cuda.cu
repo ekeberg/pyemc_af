@@ -72,7 +72,7 @@ __global__ void kernel_calculate_scaling_poisson_sparse(const int *const pattern
   float sum_slice = 0.;
   float sum_pattern = 0.;
 
-  for (int index = this_start_index+threadIdx.x; index < this_end_index; index++) {
+  for (int index = this_start_index+threadIdx.x; index < this_end_index; index += blockDim.x) {
     if (slice[pattern_indices[index]]) {
       sum_pattern += pattern_values[index];
     }
