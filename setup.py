@@ -32,8 +32,12 @@ def locate_cuda():
             raise EnvironmentError("The CUDA {0} path could not be located in {1}".format(k, v))
     return cudaconfig
 
-CUDA = locate_cuda()
-print(CUDA)
+try:
+    CUDA = locate_cuda()
+    print(CUDA)
+except EnvironmentError:
+    CUDA = None
+    print("Compiling without CUDA support")
 try:
     numpy_include = numpy.get_include()
 except AttributeError:
@@ -44,20 +48,22 @@ if find_in_path("swig", os.environ["PATH"]):
     subprocess.check_call("swig -python -c++ -o src/emc_cpu_swig_wrap.cpp src/emc_cpu.i", shell=True)
 else:
     raise EnvironmentError("The swig executable was not found in your PATH")
-    
-ext_cuda = Extension("_emc_cuda",
-                     sources=["src/emc_cuda_swig_wrap.cpp",
-                              "src/emc_cuda.cu",
-                              "src/calculate_responsabilities_cuda.cu",
-                              "src/calculate_scaling_cuda.cu",
-                              "src/update_slices_cuda.cu"],
-                     library_dirs=[CUDA["lib"]],
-                     libraries=["cudart"],
-                     runtime_library_dirs=[CUDA["lib"]],
-                     extra_compile_args={"clang": [],
-                                         "nvcc": ["--ptxas-options=-v", "-c", "--compiler-options", "'-fPIC'"]},
-                     #"nvcc": ["-arch=sm_20", "--ptxas-options=-v", "-c", "--compiler-options", "'-fPIC'"]},
-                     include_dirs=[numpy_include, CUDA["include"], "src"])
+
+if CUDA is not None:
+    ext_cuda = Extension("_emc_cuda",
+                         sources=["src/emc_cuda_swig_wrap.cpp",
+                                  "src/emc_cuda.cu",
+                                  "src/calculate_responsabilities_cuda.cu",
+                                  "src/calculate_scaling_cuda.cu",
+                                  "src/update_slices_cuda.cu"],
+                         library_dirs=[CUDA["lib"]],
+                         libraries=["cudart"],
+                         runtime_library_dirs=[CUDA["lib"]],
+                         extra_compile_args={"clang": [],
+                                             "nvcc": ["--ptxas-options=-v", "-c",
+                                                      "--compiler-options", "'-fPIC'"]},
+                         #"nvcc": ["-arch=sm_20", "--ptxas-options=-v", "-c", "--compiler-options", "'-fPIC'"]},
+                         include_dirs=[numpy_include, CUDA["include"], "src"])
 
 ext_cpu = Extension("_emc_cpu",
                     sources=["src/emc_cpu_swig_wrap.cpp",
@@ -98,14 +104,23 @@ class custom_build_ext(build_ext):
         #super(custom_build_ext, self).build_extension(ext)
         build_ext.build_extension(self, ext)
 
-setuptools.setup(name="emc",
-                 author="Tomas Ekeberg",
-                 version="0.1",
-                 py_modules=["emc", "emc_cuda", "emc_cpu"],
-                 package_dir={"": "src"},
-                 ext_modules=[ext_cuda, ext_cpu],
-                 cmdclass={"build_ext": custom_build_ext},
-                 zip_safe=False)
+if CUDA is not None:
+    setuptools.setup(name="emc",
+                     author="Tomas Ekeberg",
+                     version="0.1",
+                     py_modules=["emc", "emc_cuda", "emc_cpu"],
+                     package_dir={"": "src"},
+                     ext_modules=[ext_cuda, ext_cpu],
+                     cmdclass={"build_ext": custom_build_ext},
+                     zip_safe=False)
+else:
+    setuptools.setup(name="emc",
+                     author="Tomas Ekeberg",
+                     version="0.1",
+                     py_modules=["emc", "emc_cpu"],
+                     package_dir={"": "src"},
+                     ext_modules=[ext_cpu],
+                     zip_safe=False)
 
 # setuptools.setup(name="emc",
 #                  author="Tomas Ekeberg",
