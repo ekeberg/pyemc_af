@@ -22,10 +22,17 @@ def locate_cuda():
             raise EnvironmentError("The nvcc binary could not be located in your $PATH.")
         home = os.path.dirname(os.path.dirname(nvcc))
 
+    # cudaconfig = {"home": home,
+    #               "nvcc": nvcc,
+    #               "include": os.path.join(home, "include"),
+    #               "lib": os.path.join(home, "lib")}
     cudaconfig = {"home": home,
                   "nvcc": nvcc,
-                  "include": os.path.join(home, "include"),
-                  "lib": os.path.join(home, "lib64")}
+                  "include": os.path.join(home, "include")}
+    if os.path.exists(os.path.join(cudaconfig["home"], "lib")):
+        cudaconfig["lib"] = os.path.join(cudaconfig["home"], "lib")
+    else:
+        cudaconfig["lib"] = os.path.join(cudaconfig["home"], "lib64")
     print(cudaconfig)
     for k, v in cudaconfig.items():
         if not os.path.exists(v):
